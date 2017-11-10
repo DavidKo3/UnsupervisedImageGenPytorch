@@ -56,6 +56,8 @@ plt.figure()
 plt.imshow(x_train[0][31])
 plt.pause(5) # pause a bit so that plots are updated
 print(y_train[image_ind])
+
+
 def get_loader(config):
     """Builds and returns Dataloader for MNIST and SVHN dataset."""
     
@@ -68,14 +70,14 @@ def get_loader(config):
     mnist = datasets.MNIST(root=config.mnist_path, download=True, transform=transform)
 
     svhn_loader = torch.utils.data.DataLoader(dataset=svhn,
-                                              batch_size=config.batch_size,
+                                              batch_size=4,
                                               shuffle=True,
-                                              num_workers=config.num_workers)
+                                              num_workers=4)
 
     mnist_loader = torch.utils.data.DataLoader(dataset=mnist,
-                                               batch_size=config.batch_size,
+                                               batch_size=4,
                                                shuffle=True,
-                                               num_workers=config.num_workers)
+                                               num_workers=4)
     return svhn_loader, mnist_loader
 
 use_gpu = torch.cuda.is_available()
