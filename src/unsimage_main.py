@@ -221,7 +221,7 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                 runnining_loss += loss.data[0]
                 running_corrects += torch.sum(preds == labels.data)
                 
-                
+            
                 
                 
 
