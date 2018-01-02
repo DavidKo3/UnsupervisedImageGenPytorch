@@ -210,6 +210,8 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                 # forward 
                 outputs = model(inputs)
                 
+                _ , preds = torch.max(outputs.data , 1)
+                
                 # backward + optimize only if in training phase
                 if phase == 'train':
                     loss.backward()
@@ -217,6 +219,8 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                     
                 # statistics
                 runnining_loss += loss.data[0]
+                running_corrects += torch.sum(preds == labels.data)
+                
                 
                 
                 
