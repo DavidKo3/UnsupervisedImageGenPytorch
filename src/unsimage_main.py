@@ -207,6 +207,19 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                 # zero the parameter gradients
                 optimizer.zero_grad()
                 
+                # forward 
+                outputs = model(inputs)
+                
+                # backward + optimize only if in training phase
+                if phase == 'train':
+                    loss.backward()
+                    optimizer.step()
+                    
+                # statistics
+                runnining_loss += loss.data[0]
+                
+                
+                
 
 
     
