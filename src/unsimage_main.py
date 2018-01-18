@@ -9,6 +9,9 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.optim as optim
+
+import model
+
 # for datasets ############################################
 import torchvision
 from torchvision import datasets, models, transforms
@@ -18,6 +21,8 @@ import copy
 import os
 import copy
 import argparse
+from dask.array.reductions import moment
+from torch import FloatTensor
 
 
 parser = argparse.ArgumentParser()
@@ -100,7 +105,7 @@ def get_loader(config):
     
     return svhn_train_loader,  mnist_train_loader , mnist_test_loader
 
-use_gpu = torch.cuda.is_available()
+#use_gpu = torch.cuda.is_available()
 
 
 ######################################################################
@@ -151,6 +156,12 @@ def to_data(x):
 svhn_train_loader, mnist_train_loader, mnist_test_loader =  get_loader(config)
 mnist_iter = iter(mnist_train_loader)
 
+print ('==>>> total trainning svhn_train_loader batch number: {}'.format(len(svhn_train_loader)))
+print ('==>>> total trainning mnist_train_loader batch number: {}'.format(len(mnist_train_loader)))
+print ('==>>> total trainning mnist_test_loader batch number: {}'.format(len(mnist_test_loader)))
+
+len_train_loader = len(mnist_train_loader)
+
 
 inputs , classes  = mnist_iter.next() # [inputs, size 4x1x32x32] , [classes size 4]
 print(" inputs:", inputs)
@@ -158,6 +169,7 @@ print(" classes: ", classes)
 # Make a grid from batch
 out = torchvision.utils.make_grid(inputs)
 imshow(out, title=[classes[x] for x in [0,1,2,3]])
+
 
 
 
@@ -199,10 +211,13 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                 # get the inputs
                 inputs, labels = data
                 # wrap them in Variable
-                if use_gpu:
-                    inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
-                else:
-                    inputs, labels = Variable(inputs), Variable(labels)
+                #if use_gpu:
+                intpus = FloatTensor(inputs)
+                               
+                inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
+                
+                #else:
+                #    inputs, labels = Variable(inputs), Variable(labels)
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
@@ -220,9 +235,24 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                 # statistics
                 runnining_loss += loss.data[0]
                 running_corrects += torch.sum(preds == labels.data)
-                
+            # statistics
+            epoch_loss = running_loss/len_train_loader    
+            epoch_acc = running_corrects /len_train_loader 
             
-                
+if torch.cuda.is_available() :
+    print("WARNING: You have a CUDA device, so you should probably run with --cuda")          
+model_ft = model.D1().cuda()
+
+
+
+
+criterion = nn.CrossEntropyLoss()         
+optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
+
+       
+# Train and Evaluate
+
+model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
                 
 
 

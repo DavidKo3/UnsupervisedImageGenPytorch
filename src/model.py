@@ -25,7 +25,7 @@ class D1(nn.Module):
         self.conv1 = conv(1, conv_dim, 4, bn=False)
         self.conv2 = conv(conv_dim, conv_dim*2, 4)
         self.conv3 = conv(conv_dim*2, conv_dim*4, 4)
-        self.conv4 = conv(conv)dim*4, conv_dim*2, 4)
+        self.conv4 = conv(conv_dim*4, conv_dim*2, 4)
         n_out = 11 if use_labels else 1
 
     def forward(self, x):
