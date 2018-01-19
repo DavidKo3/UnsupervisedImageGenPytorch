@@ -164,7 +164,8 @@ len_train_loader = len(mnist_train_loader)
 
 
 inputs , classes  = mnist_iter.next() # [inputs, size 4x1x32x32] , [classes size 4]
-print(" inputs:", inputs)
+print(" type of inputs:", type(inputs))
+print("content of inputs" , (inputs))
 print(" classes: ", classes)
 # Make a grid from batch
 out = torchvision.utils.make_grid(inputs)
@@ -210,9 +211,10 @@ def train_model(model, criterion, optimizer, num_epochs=5):
             for data in mnist_train_loader:
                 # get the inputs
                 inputs, labels = data
+                print(model)
                 # wrap them in Variable
                 #if use_gpu:
-                intpus = FloatTensor(inputs)
+                # intpus = model.to_var(inputs)
                                
                 inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
                 
@@ -226,7 +228,7 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                 outputs = model(inputs)
                 
                 _ , preds = torch.max(outputs.data , 1)
-                
+                loss = criterion(outputs, labels)
                 # backward + optimize only if in training phase
                 if phase == 'train':
                     loss.backward()
