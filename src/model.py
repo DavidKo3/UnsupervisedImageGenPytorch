@@ -42,21 +42,15 @@ class D1(nn.Module):
         n_out = 11 if use_labels else 1
 
     def forward(self, x):
-        out = self.conv1(x)
-        print(out)
         out = F.relu(self.conv1(x))   # (?, 64, 16, 16)
-        print("out1")
         out = F.relu(self.conv2(out))   # (?, 128, 8, 8)
-        print("out2")
         out = F.relu(self.conv3(out))   # (?, 256, 4, 4)
         out = F.relu(self.conv4(out))   # (?, 128, 4, 4)
-        print("result of out ", out.size())
+        # print("result of out ", out.size())
         # out = [4, 128, 2 ,2 ]
         # output size = (input soze + 2 x Padding - Filter size )/ Stride +1 
         (_, C, H, W) = out.data.size()
-        out = out.view( -1 , C * H * W)
-        print("out", out)
-        
+        out = out.view( -1 , C * H * W)   
         out = self.fc(out).squeeze()
     
         return out

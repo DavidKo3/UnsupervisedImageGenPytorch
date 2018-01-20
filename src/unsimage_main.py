@@ -164,9 +164,9 @@ len_train_loader = len(mnist_train_loader)
 
 
 inputs , classes  = mnist_iter.next() # [inputs, size 4x1x32x32] , [classes size 4]
-print(" type of inputs:", type(inputs))
-print("content of inputs" , (inputs))
-print(" classes: ", classes)
+# print(" type of inputs:", type(inputs))
+# print("content of inputs" , (inputs))
+#print(" classes: ", classes)
 # Make a grid from batch
 out = torchvision.utils.make_grid(inputs)
 imshow(out, title=[classes[x] for x in [0,1,2,3]])
@@ -211,7 +211,7 @@ def train_model(model, criterion, optimizer, num_epochs=5):
             for data in mnist_train_loader:
                 # get the inputs
                 inputs, labels = data
-                print(model)
+                # print(model)
                 # wrap them in Variable
                 #if use_gpu:
                 # intpus = model.to_var(inputs)
@@ -233,13 +233,24 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                 if phase == 'train':
                     loss.backward()
                     optimizer.step()
-                    
+                   #  print("loss" , loss)
                 # statistics
-                runnining_loss += loss.data[0]
+                running_loss += loss.data[0]
                 running_corrects += torch.sum(preds == labels.data)
+                
             # statistics
             epoch_loss = running_loss/len_train_loader    
             epoch_acc = running_corrects /len_train_loader 
+            
+            print('{} Loss : {:.4f} Acc : {:.4f}'.format(phase, epoch_loss, epoch_acc))
+            
+            # deep copy yhe model
+            if phase == 'val' and epoch_acc > best_acc:
+                best_acc = epoch_acc
+                best_model = copy.deepcopy(model)
+            
+        print()
+        
             
 if torch.cuda.is_available() :
     print("WARNING: You have a CUDA device, so you should probably run with --cuda")          
