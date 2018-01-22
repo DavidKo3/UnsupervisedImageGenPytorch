@@ -226,8 +226,14 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                 
                 # forward 
                 outputs = model(inputs)
+                print("-----------------outputs------------------------")
+                print(outputs)
+                print("-----------------labels------------------------")
+                print(labels)
+                _ , preds = torch.max(outputs.data , 1) # max index with row based
+                print("-----------------prediction--------------------")
+                print(preds)
                 
-                _ , preds = torch.max(outputs.data , 1)
                 loss = criterion(outputs, labels)
                 # backward + optimize only if in training phase
                 if phase == 'train':
