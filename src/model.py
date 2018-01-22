@@ -38,7 +38,7 @@ class D1(nn.Module):
         self.conv2 = conv(conv_dim, conv_dim*2, 4)
         self.conv3 = conv(conv_dim*2, conv_dim*4, 4)
         self.conv4 = conv(conv_dim*4, conv_dim*2, 4)
-        self.fc = nn.Linear(512 , 10) # feature 128 x [2x2]
+        self.fc = nn.Linear(512 , 10) # feature size 128 x [2x2]
         n_out = 11 if use_labels else 1
 
     def forward(self, x):
@@ -50,9 +50,16 @@ class D1(nn.Module):
         # out = [4, 128, 2 ,2 ]
         # output size = (input soze + 2 x Padding - Filter size )/ Stride +1 
         (_, C, H, W) = out.data.size()
+       # print("before view out size :" , out.size())
         out = out.view( -1 , C * H * W)   
+       # print("after view out size :" , out.size())
+       # print("===================before squeeze out===========================")
+       # print(out) # [4, 128 ,2 , 2]
+       # print("===================before squeeze and fc(out) ===========================")
+       # print(self.fc(out)) # [4, 512]
         out = self.fc(out).squeeze()
-    
+       # print("===================before squeeze out===========================")
+       # print(out) # [4, 512]
         return out
 
     

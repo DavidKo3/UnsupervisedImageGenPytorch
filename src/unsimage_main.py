@@ -18,8 +18,8 @@ from torchvision import datasets, models, transforms
 ##################################################################
 import time
 import copy
+import shutil
 import os
-import copy
 import argparse
 from dask.array.reductions import moment
 from torch import FloatTensor
@@ -83,15 +83,22 @@ def get_loader(config):
                     transforms.ToTensor(),
                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     
-    svhn_train = datasets.SVHN(root=config.svhn_path,  download=True, transform=transform)
-   
-    mnist_train = datasets.MNIST(root=config.mnist_path, train=True,download=True, transform=transform)
+    svhn_extra_train = datasets.SVHN(root=config.svhn_path,  split='extra', download=True, transform=transform)
+    svhn_test = datasets.SVHN(root=config.svhn_path,  split='test', download=True, transform=transform)
+    mnist_train = datasets.MNIST(root=config.mnist_path, train=True, download=True, transform=transform)
     mnist_test = datasets.MNIST(root=config.mnist_path, train=False, transform=transform)
     
-    svhn_train_loader = torch.utils.data.DataLoader(dataset=svhn_train,
+    svhn_extra_train_loader = torch.utils.data.DataLoader(dataset=svhn_extra_train,
                                               batch_size=4,
                                               shuffle=True,
                                               num_workers=4)
+      
+    svhn_test_loader = torch.utils.data.DataLoader(dataset=svhn_test,
+                                              batch_size=4,
+                                              shuffle=True,
+                                              num_workers=4)
+  
+  
   
     mnist_train_loader = torch.utils.data.DataLoader(dataset=mnist_train,
                                                batch_size=4,
@@ -103,7 +110,7 @@ def get_loader(config):
                                                shuffle=True,
                                                num_workers=4)
     
-    return svhn_train_loader,  mnist_train_loader , mnist_test_loader
+    return svhn_extra_train_loader,  svhn_test_loader, mnist_train_loader , mnist_test_loader
 
 #use_gpu = torch.cuda.is_available()
 
@@ -153,10 +160,12 @@ def to_data(x):
     return x.data.numpy()
 
 
-svhn_train_loader, mnist_train_loader, mnist_test_loader =  get_loader(config)
-mnist_iter = iter(mnist_train_loader)
+svhn_extra_train_loader, svhn_test_loader ,mnist_train_loader, mnist_test_loader =  get_loader(config)
+mnist_iter = iter(svhn_extra_train_loader)
 
-print ('==>>> total trainning svhn_train_loader batch number: {}'.format(len(svhn_train_loader)))
+print ('==>>> total trainning svhn_extra_train_loader batch number: {}'.format(len(svhn_extra_train_loader)))    # extra dataset 4 * 132,783 = 531,132
+print ('==>>> total trainning svhn_test_loader batch number: {}'.format(len(svhn_test_loader)))    #
+
 print ('==>>> total trainning mnist_train_loader batch number: {}'.format(len(mnist_train_loader)))
 print ('==>>> total trainning mnist_test_loader batch number: {}'.format(len(mnist_test_loader)))
 
@@ -173,7 +182,10 @@ imshow(out, title=[classes[x] for x in [0,1,2,3]])
 
 
 
-
+def save_checkpoint(state, is_best, filename='./checkpoint.pth.tar'):
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, './model_best.pth.tar')
 
 
 
@@ -226,13 +238,13 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                 
                 # forward 
                 outputs = model(inputs)
-                print("-----------------outputs------------------------")
-                print(outputs)
-                print("-----------------labels------------------------")
-                print(labels)
-                _ , preds = torch.max(outputs.data , 1) # max index with row based
-                print("-----------------prediction--------------------")
-                print(preds)
+                # print("-----------------outputs------------------------")
+                # print(outputs)
+                # print("-----------------labels------------------------")
+                # print(labels)
+                _ , preds = torch.max(outputs.data , 1) # max index with row
+                # print("-----------------prediction--------------------")
+                # print(preds)
                 
                 loss = criterion(outputs, labels)
                 # backward + optimize only if in training phase
@@ -253,8 +265,10 @@ def train_model(model, criterion, optimizer, num_epochs=5):
             # deep copy yhe model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
-                best_model = copy.deepcopy(model)
-            
+                is_best = best_acc
+                #
+                # best_model = copy.deepcopy(model)
+                save_checkpoint({'epoch': epoch+1 , 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
         print()
         
             
