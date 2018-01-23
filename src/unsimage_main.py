@@ -23,12 +23,14 @@ import os
 import argparse
 from dask.array.reductions import moment
 from torch import FloatTensor
+from bokeh.themes import default
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--image_size', type=int, default=32)
 parser.add_argument('--svhn_path', type=str, default='./datasets/svhn')
-parser.add_argument('--mnist-path', type=str , default='./datasets/mnist')
+parser.add_argument('--mnist_path', type=str , default='./datasets/mnist')
+parser.add_argument('--svhn_trainedmodel', type=str, default='./model_best.pth.tar')
 config = parser.parse_args()
 print(config)
 print(config.mnist_path)
@@ -285,8 +287,12 @@ optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
        
 # Train and Evaluate
 
-model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
+# model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
                 
 
+if os.path.isfile(config.svhn_trainedmodel):
+    print("=> loading checkpoint '{}'".format(config.svhn_trainedmodel))
+    checkpoint = torch.load(config.svhn_trainedmodel)
+    print(checkpoint)
 
     
