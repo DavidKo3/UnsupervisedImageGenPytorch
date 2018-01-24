@@ -24,9 +24,12 @@ import argparse
 from dask.array.reductions import moment
 from torch import FloatTensor
 from bokeh.themes import default
+from Cython.Compiler.PyrexTypes import best_match
 
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--arch', type=str, default='svhnDiscrimanator')
+parser.add_argument('--startepoch', type=int, default=0)
 parser.add_argument('--image_size', type=int, default=32)
 parser.add_argument('--svhn_path', type=str, default='./datasets/svhn')
 parser.add_argument('--mnist_path', type=str , default='./datasets/mnist')
@@ -114,7 +117,7 @@ def get_loader(config):
     
     return svhn_extra_train_loader,  svhn_test_loader, mnist_train_loader , mnist_test_loader
 
-#use_gpu = torch.cuda.is_available()
+
 
 
 ######################################################################
@@ -270,12 +273,15 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                 is_best = best_acc
                 #
                 # best_model = copy.deepcopy(model)
-                save_checkpoint({'epoch': epoch+1 , 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
+                save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
         print()
         
-            
+
+use_gpu = torch.cuda.is_available()
+    
 if torch.cuda.is_available() :
-    print("WARNING: You have a CUDA device, so you should probably run with --cuda")          
+    print("WARNING: You have a CUDA device, so you should probably run with --cuda")     
+         
 model_ft = model.D1().cuda()
 
 
@@ -289,10 +295,14 @@ optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
 
 # model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
                 
-
+best_prec_SVHN= 0
+svhn_model = 0
 if os.path.isfile(config.svhn_trainedmodel):
     print("=> loading checkpoint '{}'".format(config.svhn_trainedmodel))
     checkpoint = torch.load(config.svhn_trainedmodel)
-    print(checkpoint)
-
-    
+    svhn_model = model_ft.load_state_dict(checkpoint['state_dict'])
+    best_prec_SVHN = checkpoint['best_acc']
+    print(config.arch)
+    print(checkpoint['arch'])
+    print(best_prec_SVHN)
+    print(svhn_model)
