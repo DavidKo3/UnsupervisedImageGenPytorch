@@ -209,73 +209,78 @@ def train_model(model, criterion, optimizer, num_epochs=5):
     
     best_model= model
     best_acc = 0.0
+    if os.path.isfile(config.svhn_trainedmodel):
+        print("=> loading checkpoint '{}'".format(config.svhn_trainedmodel))
+        checkpoint = torch.load(config.svhn_trainedmodel)
+        best_model.load_state_dict(checkpoint['state_dict']) # fixed weight , bias for network 
     
-    for epoch in range(num_epochs):
-        print('Epoch {}/{}'.format(epoch, num_epochs - 1))
-        print('--------------------------------------------')
-        
-        # Each epoch has a training and validation phase
-        for phase in ['train', 'val']:
-            if phase == 'train':
-                model.train(True)
-            else:
-                model.train(False)
-                
-            running_loss =0.0
-            running_corrects = 0
+    elif os.path.isfile(config.svhn_trainedmodel):
+        for epoch in range(num_epochs):
+            print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+            print('--------------------------------------------')
             
-            #Iterate over data.
-            for data in mnist_train_loader:
-                # get the inputs
-                inputs, labels = data
-                # print(model)
-                # wrap them in Variable
-                #if use_gpu:
-                # intpus = model.to_var(inputs)
-                               
-                inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
-                
-                #else:
-                #    inputs, labels = Variable(inputs), Variable(labels)
-
-                # zero the parameter gradients
-                optimizer.zero_grad()
-                
-                # forward 
-                outputs = model(inputs)
-                # print("-----------------outputs------------------------")
-                # print(outputs)
-                # print("-----------------labels------------------------")
-                # print(labels)
-                _ , preds = torch.max(outputs.data , 1) # max index with row
-                # print("-----------------prediction--------------------")
-                # print(preds)
-                
-                loss = criterion(outputs, labels)
-                # backward + optimize only if in training phase
+            # Each epoch has a training and validation phase
+            for phase in ['train', 'val']:
                 if phase == 'train':
-                    loss.backward()
-                    optimizer.step()
-                   #  print("loss" , loss)
-                # statistics
-                running_loss += loss.data[0]
-                running_corrects += torch.sum(preds == labels.data)
+                    model.train(True)
+                else:
+                    model.train(False)
+                    
+                running_loss =0.0
+                running_corrects = 0
                 
-            # statistics
-            epoch_loss = running_loss/len_train_loader    
-            epoch_acc = running_corrects /len_train_loader 
-            
-            print('{} Loss : {:.4f} Acc : {:.4f}'.format(phase, epoch_loss, epoch_acc))
-            
-            # deep copy yhe model
-            if phase == 'val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
-                is_best = best_acc
-                #
-                # best_model = copy.deepcopy(model)
-                save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
+                #Iterate over data.
+                for data in mnist_train_loader:
+                    # get the inputs
+                    inputs, labels = data
+                    # print(model)
+                    # wrap them in Variable
+                    #if use_gpu:
+                    # intpus = model.to_var(inputs)
+                                   
+                    inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
+                    
+                    #else:
+                    #    inputs, labels = Variable(inputs), Variable(labels)
+    
+                    # zero the parameter gradients
+                    optimizer.zero_grad()
+                    
+                    # forward 
+                    outputs = model(inputs)
+                    # print("-----------------outputs------------------------")
+                    # print(outputs)
+                    # print("-----------------labels------------------------")
+                    # print(labels)
+                    _ , preds = torch.max(outputs.data , 1) # max index with row
+                    # print("-----------------prediction--------------------")
+                    # print(preds)
+                    
+                    loss = criterion(outputs, labels)
+                    # backward + optimize only if in training phase
+                    if phase == 'train':
+                        loss.backward()
+                        optimizer.step()
+                       #  print("loss" , loss)
+                    # statistics
+                    running_loss += loss.data[0]
+                    running_corrects += torch.sum(preds == labels.data)
+                    
+                # statistics
+                epoch_loss = running_loss/len_train_loader    
+                epoch_acc = running_corrects /len_train_loader 
+                
+                print('{} Loss : {:.4f} Acc : {:.4f}'.format(phase, epoch_loss, epoch_acc))
+                
+                # deep copy yhe model
+                if phase == 'val' and epoch_acc > best_acc:
+                    best_acc = epoch_acc
+                    is_best = best_acc
+                    #
+                    # best_model = copy.deepcopy(model)
+                    save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
         print()
-        
+    return best_model
 
 use_gpu = torch.cuda.is_available()
     
@@ -286,23 +291,25 @@ model_ft = model.D1().cuda()
 
 
 
-
 criterion = nn.CrossEntropyLoss()         
 optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
 
        
 # Train and Evaluate
 
-# model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
+model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
+   
+
                 
 best_prec_SVHN= 0
-svhn_model = 0
+
 if os.path.isfile(config.svhn_trainedmodel):
     print("=> loading checkpoint '{}'".format(config.svhn_trainedmodel))
     checkpoint = torch.load(config.svhn_trainedmodel)
-    svhn_model = model_ft.load_state_dict(checkpoint['state_dict'])
+   #  model_ft.load_state_dict(checkpoint['state_dict'])
     best_prec_SVHN = checkpoint['best_acc']
     print(config.arch)
     print(checkpoint['arch'])
     print(best_prec_SVHN)
-    print(svhn_model)
+    print(model_ft.state_dict())
+    print("dsfsdfs")
