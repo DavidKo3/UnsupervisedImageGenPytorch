@@ -129,7 +129,6 @@ def get_loader(config):
 def imshow(inp, title=None):
     """Imshow for Tensor."""
     inp = inp.numpy().transpose((1, 2, 0))
-    print("sdfsdf")
     mean = np.array([0.485, 0.456, 0.406])
     std = np.array([0.229, 0.224, 0.225])
     inp = std * inp + mean
@@ -174,13 +173,16 @@ print ('==>>> total trainning svhn_test_loader batch number: {}'.format(len(svhn
 print ('==>>> total trainning mnist_train_loader batch number: {}'.format(len(mnist_train_loader)))
 print ('==>>> total trainning mnist_test_loader batch number: {}'.format(len(mnist_test_loader)))
 
-len_train_loader = len(mnist_train_loader)
+
+
+
+len_train_loader = 4*len(mnist_train_loader)
 
 
 inputs , classes  = mnist_iter.next() # [inputs, size 4x1x32x32] , [classes size 4]
-# print(" type of inputs:", type(inputs))
-# print("content of inputs" , (inputs))
-#print(" classes: ", classes)
+print(" type of inputs:", type(inputs))
+print("content of inputs" , (inputs))
+print(" classes: ", classes)
 # Make a grid from batch
 out = torchvision.utils.make_grid(inputs)
 imshow(out, title=[classes[x] for x in [0,1,2,3]])
@@ -214,7 +216,7 @@ def train_model(model, criterion, optimizer, num_epochs=5):
         checkpoint = torch.load(config.svhn_trainedmodel)
         best_model.load_state_dict(checkpoint['state_dict']) # fixed weight , bias for network 
     
-    elif os.path.isfile(config.svhn_trainedmodel):
+    if not os.path.isfile(config.svhn_trainedmodel):
         for epoch in range(num_epochs):
             print('Epoch {}/{}'.format(epoch, num_epochs - 1))
             print('--------------------------------------------')
@@ -222,9 +224,11 @@ def train_model(model, criterion, optimizer, num_epochs=5):
             # Each epoch has a training and validation phase
             for phase in ['train', 'val']:
                 if phase == 'train':
-                    model.train(True)
+                    model.train()
+                    #model.train(True)
                 else:
-                    model.train(False)
+                    model.eval()
+                    # model.train(False)
                     
                 running_loss =0.0
                 running_corrects = 0
@@ -248,7 +252,7 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                     
                     # forward 
                     outputs = model(inputs)
-                    # print("-----------------outputs------------------------")
+                    #print("-----------------outputs------------------------")
                     # print(outputs)
                     # print("-----------------labels------------------------")
                     # print(labels)
@@ -287,8 +291,9 @@ use_gpu = torch.cuda.is_available()
 if torch.cuda.is_available() :
     print("WARNING: You have a CUDA device, so you should probably run with --cuda")     
          
+print("11")
 model_ft = model.D1().cuda()
-
+print("22")
 
 
 criterion = nn.CrossEntropyLoss()         
@@ -296,10 +301,10 @@ optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
 
        
 # Train and Evaluate
-
+print("33")
 model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
    
-
+print("44")
                 
 best_prec_SVHN= 0
 
@@ -308,8 +313,8 @@ if os.path.isfile(config.svhn_trainedmodel):
     checkpoint = torch.load(config.svhn_trainedmodel)
    #  model_ft.load_state_dict(checkpoint['state_dict'])
     best_prec_SVHN = checkpoint['best_acc']
-    print(config.arch)
-    print(checkpoint['arch'])
-    print(best_prec_SVHN)
-    print(model_ft.state_dict())
-    print("dsfsdfs")
+   # print(config.arch)
+   # print(checkpoint['arch'])
+   # print(best_prec_SVHN)
+   # print(model_ft.state_dict())
+   # print("dsfsdfs")

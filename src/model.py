@@ -32,15 +32,63 @@ def _get_conv_output(shape):
 
 class D1(nn.Module):
     """Discriminator for mnist."""
-    def __init__(self, conv_dim=64, use_labels=False):
+    def __init__(self, conv_dim=64, use_labels=True):
         super(D1, self).__init__()
-        self.conv1 = conv(1, conv_dim, 4, bn=False)
+        self.conv1 = conv(1, conv_dim, 4, bn=False)     
         self.conv2 = conv(conv_dim, conv_dim*2, 4)
         self.conv3 = conv(conv_dim*2, conv_dim*4, 4)
         self.conv4 = conv(conv_dim*4, conv_dim*2, 4)
-        self.fc = nn.Linear(512 , 10) # feature size 128 x [2x2]
-        n_out = 11 if use_labels else 1
+        # self.fc = nn.Linear(512 , 10) # feature size 128 x [2x2]
+        n_out = 10 if use_labels else 1
+        self.fc = conv(conv_dim*2, n_out, 2, 1, 0, False)
 
+    def forward(self, x):
+        out = F.relu(self.conv1(x))   # (?, 64, 16, 16)
+        out = F.relu(self.conv2(out))   # (?, 128, 8, 8)
+        out = F.relu(self.conv3(out))   # (?, 256, 4, 4)
+        out = F.relu(self.conv4(out))   # (?, 128, 2, 2)
+   
+        # print("result of out ", out.size())
+        # out = [4, 128, 2 ,2 ]
+        # output size = (input soze + 2 x Padding - Filter size )/ Stride +1 
+       # (_, C, H, W) = out.data.size()
+       # print("before view out size :" , out.size())
+       # out = out.view( -1 , C * H * W)   
+       # print("after view out size :" , out.size())
+       # print("===================before squeeze out===========================")
+       # print(out) # [4, 128 ,2 , 2]
+       # print("===================before squeeze and fc(out) ===========================")
+       # print(self.fc(out)) # [4, 512]
+        out = self.fc(out).squeeze()
+       # print("===================before squeeze out===========================")
+       # print(out) # [4, 512]
+
+        return out
+
+    
+    
+    def to_var(x):
+        """Converts numpy to variable"""
+        if torch.cuda.is_available():
+            x = x.cuda()
+        return Variable(x)
+
+    def to_data(x):
+        """"Converts variable to numpy"""
+        if torch.cuda.is_available():
+            x = x.cpu()
+        return x.data.numpy()
+    
+class D2(nn.Module):
+    """Discriminator for svhn."""
+    def __init__(self, conv_dim=64, use_labels=False):
+        super(D2, self).__init__()
+        self.conv1 = conv(3, conv_dim, 4, bn=False)
+        self.conv2 = conv(conv_dim, conv_dim*2, 4)
+        self.conv3 = conv(conv_dim*2, conv_dim*4, 4)
+        n_out = 11 if use_labels else 1
+        self.fc = conv(conv_dim*4, n_out, 4, 1, 0, False)
+        
     def forward(self, x):
         out = F.relu(self.conv1(x))   # (?, 64, 16, 16)
         out = F.relu(self.conv2(out))   # (?, 128, 8, 8)
@@ -75,21 +123,4 @@ class D1(nn.Module):
         if torch.cuda.is_available():
             x = x.cpu()
         return x.data.numpy()
-    
-class D2(nn.Module):
-    """Discriminator for svhn."""
-    def __init__(self, conv_dim=64, use_labels=False):
-        super(D2, self).__init__()
-        self.conv1 = conv(3, conv_dim, 4, bn=False)
-        self.conv2 = conv(conv_dim, conv_dim*2, 4)
-        self.conv3 = conv(conv_dim*2, conv_dim*4, 4)
-        n_out = 11 if use_labels else 1
-        self.fc = conv(conv_dim*4, n_out, 4, 1, 0, False)
-        
-    def forward(self, x):
-        out = F.leaky_relu(self.conv1(x), 0.05)    # (?, 64, 16, 16)
-        out = F.leaky_relu(self.conv2(out), 0.05)  # (?, 128, 8, 8)
-        out = F.leaky_relu(self.conv3(out), 0.05)  # (?, 256, 4, 4)
-        out = self.fc(out).squeeze()
-        return out
     
