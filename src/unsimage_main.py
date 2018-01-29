@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import numpy as np
+import scipy.misc 
 import scipy.io as sio
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -28,7 +29,7 @@ from Cython.Compiler.PyrexTypes import best_match
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--batch_size', type=int, default=1000)
+parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--arch', type=str, default='svhnDiscrimanator')
 parser.add_argument('--startepoch', type=int, default=0)
 parser.add_argument('--image_size', type=int, default=32)
@@ -192,6 +193,31 @@ inputs , classes  = mnist_iter.next() # [inputs, size 4x1x32x32] , [classes size
 # Make a grid from batch
 out = torchvision.utils.make_grid(inputs)
 imshow(out, title=[classes[x] for x in [0,1,2,3]])
+
+
+def merge_images(sources, targets, k=10):
+    _, _, h, w = sources.shape
+    row = int(np.sqrt(config.batch_size))
+    merged = np.zeros([3, row*h, row*w*2])
+    for idx, (s, t) in enumerate(zip(sources, targets)):
+        i = idx // row
+        j = idx % row
+        merged[:, i*h:(i+1)*h, (j*2)*h:(j*2+1)*h] = s
+        merged[:, i*h:(i+1)*h, (j*2+1)*h:(j*2+2)*h] = t
+    return merged.transpose(1, 2, 0)
+   
+def to_var(self, x):
+    """Converts numpy to variable."""
+    if torch.cuda.is_available():
+        x = x.cuda()
+    return Variable(x)
+    
+def to_data(self, x):
+    """Converts variable to numpy."""
+    if torch.cuda.is_available():
+            x = x.cpu()
+    return x.data.numpy()
+
 
 def save_checkpoint(state, is_best, filename='./svhn_extra_mnist_model_best.pth.tar'):
     torch.save(state, filename)
@@ -578,7 +604,7 @@ def test_model_v2(model, criterion, optimizer, num_epochs):
     time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
 
-def train_geneated_model_(model_generator, model_dicriminator,criterion, optimizer, num_epochs):
+def train_generated_model_(model_generator, model_dicriminator,criterion, optimizer, num_epochs):
     since = time.time()
     
     trained_svhn_dicscrimator_model= model_dicriminator
@@ -588,6 +614,9 @@ def train_geneated_model_(model_generator, model_dicriminator,criterion, optimiz
         checkpoint = torch.load(config.svhn_trainedmodel)
         trained_svhn_dicscrimator_model.load_state_dict(checkpoint['state_dict']) # fixed weight , bias for network 
     
+    mnist_iter = iter(mnist_test_loader)
+    svhn_iter = iter(svhn_test_loader)
+    iter_per_epoch = min(len(svhn_iter), len(mnist_iter))
     if not os.path.isfile(config.svhn_trainedmodel):
         for epoch in range(num_epochs):
             print('Epoch {}/{}'.format(epoch, num_epochs - 1))
@@ -601,22 +630,24 @@ def train_geneated_model_(model_generator, model_dicriminator,criterion, optimiz
                 else:
                     model_generator.eval()
                     # model.train(False)
-                    
+                       
+                                                     
                 running_loss =0.0
                 running_corrects = 0
                 
                 #Iterate over data.
-                for data in data_loader[phase]:
+                for step in range(40000):
                     # get the inputs
-                    inputs, labels = data
-                    # print(model)
-                    # wrap them in Variable
-                    #if use_gpu:
-                    # intpus = model.to_var(inputs)
-                    # inputs = inputs.type(torch.FloatTensor),
-                    labels = labels.type(torch.LongTensor)       
-                    labels = labels.long().squeeze() # from svhan labels byte to long and reform size 4x1 to size 4      
-                    inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
+                    # inputs, labels = data
+                    print("svhn_iter_next :" , svhn_iter.next()[0].size() )
+                    fixed_svhn = Variable(svhn_iter.next()[0].cuda()) 
+                    print("Df")
+                    # load svhn and mnist dataset
+                    svhn, s_labels = svhn_iter.next() 
+                    svhn, s_labels = Variable(svhn.cuda()), Variable(s_labels.cuda()).long().squeeze()
+                    mnist, m_labels = mnist_iter.next() 
+                    mnist, m_labels = Variable(mnist.cuda()), Variable(m_labels.cuda())
+                    
                     
                     #else:
                     #    inputs, labels = Variable(inputs), Variable(labels)
@@ -625,10 +656,19 @@ def train_geneated_model_(model_generator, model_dicriminator,criterion, optimiz
                     optimizer.zero_grad()
                    
                     # forward 
-                    fake_mnist = model_generator(inputs)
+                    fake_mnist = model_generator(svhn)
                     # print('fake_mnist size : ', fake_mnist.size())
                     outputs = trained_svhn_dicscrimator_model(fake_mnist)
                     
+                    fake_svhn = model_generator(fixed_svhn)
+                    print("fake_svhn size : ", fake_svhn.size())
+                    fake_svhn = fake_svhn.cpu().data.numpy()
+                    
+                    fixed_svhn = fixed_svhn.cpu().data.numpy()
+                    
+                    merged = merge_images(fixed_svhn, fake_svhn)
+                    path = os.path.join('./', 'sample-%d-m-s.png' %(step+1))
+                    scipy.misc.imsave(path, merged)
                     # print("-----------------outputs------------------------")
                     # print(outputs)  # FloatTensor of size 4x10
                     # print("-----------------labels------------------------")
@@ -637,7 +677,7 @@ def train_geneated_model_(model_generator, model_dicriminator,criterion, optimiz
                     # print("-----------------prediction--------------------")
                     # print(preds)    # LongTensor of size 4 
                     
-                    loss = criterion(outputs, labels)
+                    loss = criterion(outputs, s_labels)
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
@@ -645,7 +685,7 @@ def train_geneated_model_(model_generator, model_dicriminator,criterion, optimiz
                        #  print("loss" , loss)
                     # statistics
                     running_loss += loss.data[0]
-                    running_corrects += torch.sum(preds == labels.data)
+                    running_corrects += torch.sum(preds == s_labels.data)
                     
                 # statistics
                 epoch_loss = running_loss/len_svhn_extra_train_loader   
@@ -688,7 +728,7 @@ optimzer_ft = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
 # model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
 # model_ft = test_model(model_ft, criterion, optimzer_ft, num_epochs=3)    
 
-model_ft = train_geneated_model_(model_ft, model_ft2, criterion, optimzer_ft, num_epochs=5)  
+model_ft = train_generated_model_(model_ft, model_ft2, criterion, optimzer_ft, num_epochs=5)  
 """
 for epoch in range(23):
     train_model_v2(model_ft, criterion, optimzer_ft, epoch)
