@@ -635,13 +635,20 @@ def train_generated_model_(model_generator, model_dicriminator,criterion, optimi
                 running_loss =0.0
                 running_corrects = 0
                 
+                
+                
+                
                 #Iterate over data.
                 for step in range(40000):
                     # get the inputs
                     # inputs, labels = data
-                    print("svhn_iter_next :" , svhn_iter.next()[0].size() )
+                    # reset data_iter for each epoch
+                    if (step+1) % iter_per_epoch == 0:
+                        mnist_iter = iter(mnist_test_loader)
+                        svhn_iter = iter(svhn_test_loader)
+                    
                     fixed_svhn = Variable(svhn_iter.next()[0].cuda()) 
-                    print("Df")
+                   
                     # load svhn and mnist dataset
                     svhn, s_labels = svhn_iter.next() 
                     svhn, s_labels = Variable(svhn.cuda()), Variable(s_labels.cuda()).long().squeeze()
@@ -660,13 +667,13 @@ def train_generated_model_(model_generator, model_dicriminator,criterion, optimi
                     # print('fake_mnist size : ', fake_mnist.size())
                     outputs = trained_svhn_dicscrimator_model(fake_mnist)
                     
-                    fake_svhn = model_generator(fixed_svhn)
-                    print("fake_svhn size : ", fake_svhn.size())
-                    fake_svhn = fake_svhn.cpu().data.numpy()
-                    
+                    reconst_svhn = model_generator(fixed_svhn)
+                    print("1 reconst_svhn size : ", reconst_svhn.size())
+                    reconst_svhn = reconst_svhn.cpu().data.numpy()
+                    print("2 reconst_svhn size : ", reconst_svhn.shape)
                     fixed_svhn = fixed_svhn.cpu().data.numpy()
                     
-                    merged = merge_images(fixed_svhn, fake_svhn)
+                    merged = merge_images(fixed_svhn, reconst_svhn)
                     path = os.path.join('./', 'sample-%d-m-s.png' %(step+1))
                     scipy.misc.imsave(path, merged)
                     # print("-----------------outputs------------------------")
