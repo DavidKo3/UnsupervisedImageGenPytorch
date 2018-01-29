@@ -128,3 +128,41 @@ class D2(nn.Module):
             x = x.cpu()
         return x.data.numpy()
     
+class G(nn.Module):
+    """Generator for transfering svhn to mnist """
+    def __init__(self, conv_dim=64, use_labels=True):
+        super(G, self).__init__()
+        # Encoding 
+        self.conv1 = conv(3, conv_dim, 4)
+        self.conv2 = conv(conv_dim, conv_dim*2, 4)
+        
+         # residual blocks
+        self.conv3 = conv(conv_dim*2, conv_dim*2, 3, 1, 1)
+        self.conv4 = conv(conv_dim*2, conv_dim*2, 3, 1, 1)
+        
+        # Decoding 
+        self.deconv1 = deconv(conv_dim*2, conv_dim, 4)
+        self.deconv2 = deconv(conv_dim, 1,4, bn=False)
+        
+    def forward(self, x):
+        out = F.relu(self.conv1(x))   # (?, 64, 16, 16)
+        #print('conv1 ', out.size())
+        out = F.relu(self.conv2(out))   # (?, 128, 8, 8)
+        # print('conv2 ', out.size())
+        out = F.relu(self.deconv1(out))   # (?, 64, 16, 16)
+        # print('deconv1 ', out.size())
+        out = F.tanh(self.deconv2(out))   # (?, 1, 32, 32)
+        # print("deconv2", out.size())
+        return out
+
+    def to_var(x):
+        """Converts numpy to variable"""
+        if torch.cuda.is_available():
+            x = x.cuda()
+        return Variable(x)
+
+    def to_data(x):
+        """"Converts variable to numpy"""
+        if torch.cuda.is_available():
+            x = x.cpu()
+        return x.data.numpy()

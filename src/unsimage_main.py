@@ -28,7 +28,7 @@ from Cython.Compiler.PyrexTypes import best_match
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--batch_size', type=int, default=64)
+parser.add_argument('--batch_size', type=int, default=1000)
 parser.add_argument('--arch', type=str, default='svhnDiscrimanator')
 parser.add_argument('--startepoch', type=int, default=0)
 parser.add_argument('--image_size', type=int, default=32)
@@ -177,22 +177,26 @@ print ('==>>> total trainning mnist_test_loader batch number: {}'.format(len(mni
 
 
 len_svhn_extra_train_loader = config.batch_size*len(svhn_extra_train_loader)
+len_svhn_test_loader = config.batch_size*len(svhn_test_loader)
 len_mnist_train_loader = config.batch_size*len(mnist_train_loader)
+len_mnist_test_loader = config.batch_size*len(mnist_test_loader)
 
 
+data_loader = {'train': svhn_extra_train_loader, 'val' :svhn_test_loader}
+len_data_loader = {'train': len_svhn_extra_train_loader, 'val' : len_svhn_test_loader}
 inputs , classes  = mnist_iter.next() # [inputs, size 4x1x32x32] , [classes size 4]
 #classes = classes.view(-1)
-print(" type of inputs:", type(inputs))
-print("content of inputs" , (inputs))
-print(" classes: ", classes)
+#print(" type of inputs:", type(inputs))
+#print("content of inputs" , (inputs))
+# print(" classes: ", classes)
 # Make a grid from batch
 out = torchvision.utils.make_grid(inputs)
 imshow(out, title=[classes[x] for x in [0,1,2,3]])
 
-def save_checkpoint(state, is_best, filename='./mnist_checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, filename='./svhn_extra_mnist_model_best.pth.tar'):
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, './mnist_model_best.pth.tar')
+        shutil.copyfile(filename, './svhn_extra_mnist_checkpoint.pth.tar')
 
 #def save_checkpoint(state, is_best, filename='./svhn_extra_checkpoint.pth.tar'):
 #    torch.save(state, filename)
@@ -239,7 +243,7 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                 running_corrects = 0
                 
                 #Iterate over data.
-                for data in svhn_extra_train_loader:
+                for data in data_loader[phase]:
                     # get the inputs
                     inputs, labels = data
                     # print(model)
@@ -283,13 +287,379 @@ def train_model(model, criterion, optimizer, num_epochs=5):
                 
                 print('{} Loss : {:.4f} Acc : {:.4f}'.format(phase, epoch_loss, epoch_acc))
                 
-                # deep copy yhe model
+                # deep copy the model
                 if phase == 'val' and epoch_acc > best_acc:
                     best_acc = epoch_acc
                     is_best = best_acc
                     #
                     # best_model = copy.deepcopy(model)
-                    save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
+                    # save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
+        print()
+        
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(
+    time_elapsed // 60, time_elapsed % 60))
+    print('Best val Acc: {:4f}'.format(best_acc))
+    return best_model
+
+def test_model(model, criterion, optimizer, num_epochs=1000):
+    since = time.time()
+    
+    best_model= model
+    best_acc = 0.0
+    if os.path.isfile(config.svhn_trainedmodel):
+        print("=> loading checkpoint '{}'".format(config.svhn_trainedmodel))
+        checkpoint = torch.load(config.svhn_trainedmodel)
+        best_model.load_state_dict(checkpoint['state_dict']) # fixed weight , bias for network 
+    
+    if not os.path.isfile(config.svhn_trainedmodel):
+        
+        test_loss =0.0
+        test_corrects = 0
+            
+        #Iterate over data.
+        for data in data_loader['val']:
+            # get the inputs
+            inputs, labels = data
+                # print(model)
+                # wrap them in Variable
+                #if use_gpu:
+                # intpus = model.to_var(inputs)
+                # inputs = inputs.type(torch.FloatTensor),
+            labels = labels.type(torch.LongTensor)       
+            labels = labels.long().squeeze() # from svhan labels byte to long and reform size 4x1 to size 4      
+            inputs, labels = Variable(inputs.cuda(),  volatile=True), Variable(labels.cuda())
+                   
+                # forward 
+            outputs = model(inputs)
+                # print("-----------------outputs------------------------")
+                # print(outputs)  # FloatTensor of size 4x10
+                # print("-----------------labels------------------------")
+                # print(labels)   # LongTensor of size 4
+            _ , preds = torch.max(outputs.data , 1) # max index with row
+                # print("-----------------prediction--------------------")
+                # print(preds)    # LongTensor of size 4 
+                    
+            loss = criterion(outputs, labels)
+
+
+            # statistics
+            test_loss += loss.data[0]
+            test_corrects += torch.sum(preds == labels.data)
+           # print('{} len_svhn_test:{:.4f}, loss :{:.4f}, acc:{:.4f}'.format(epoch, len_data_loader['val'] , test_loss, test_corrects))
+                 
+        # statistics
+        test_loss = test_loss/len_data_loader['val']   
+        test_corrects = test_corrects /len_data_loader['val']
+                
+        print('{} Loss : {:.4f} Acc : {:.4f}'.format('test', test_loss, test_corrects))
+                
+        # deep copy the model
+        if test_corrects > best_acc:
+            best_acc = test_corrects
+            is_best = best_acc
+                #
+                # best_model = copy.deepcopy(model)
+                # save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
+    print()
+        
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(
+    time_elapsed // 60, time_elapsed % 60))
+    print('Best val Acc: {:4f}'.format(best_acc))
+
+def train_test_model(model, criterion, optimizer, num_epochs=3):
+    since = time.time()
+    
+    best_model= model
+    best_acc = 0.0
+    if os.path.isfile(config.svhn_trainedmodel):
+        print("=> loading checkpoint '{}'".format(config.svhn_trainedmodel))
+        checkpoint = torch.load(config.svhn_trainedmodel)
+        best_model.load_state_dict(checkpoint['state_dict']) # fixed weight , bias for network 
+    
+    if not os.path.isfile(config.svhn_trainedmodel):
+        
+        training_loss =0.0
+        training_corrects = 0
+        
+        test_loss =0.0
+        test_corrects = 0
+        
+        for epoch in range(num_epochs):
+            print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+            print('--------------------------------------------')
+            
+            # Each epoch has a training and validation phase
+            for phase in ['train', 'val']:
+                if phase == 'train':
+                    model.train()
+                    #model.train(True)
+                else:
+                    model.eval()
+                    # model.train(False)
+                    
+                #Iterate over data.
+                for data in data_loader[phase]:
+                    # get the inputs
+                    inputs, labels = data
+                    # print(model)
+                    # wrap them in Variable
+                    #if use_gpu:
+                    # intpus = model.to_var(inputs)
+                    # inputs = inputs.type(torch.FloatTensor),
+                    labels = labels.type(torch.LongTensor)       
+                    labels = labels.long().squeeze() # from svhan labels byte to long and reform size 4x1 to size 4      
+                    if phase == 'train':
+                        inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
+                        # zero the parameter gradients
+                        optimizer.zero_grad()
+                        outputs = model(inputs)
+                        _ , preds = torch.max(outputs.data , 1) # max index with row
+                        loss = criterion(outputs, labels)
+                        loss.backward()
+                        optimizer.step()
+                        # statistics
+                        training_loss = loss.data[0]
+                        training_corrects += torch.sum(preds == labels.data)
+                    else:
+                        inputs, labels = Variable(inputs.cuda(), volatile=True), Variable(labels.cuda())
+                        outputs = model(inputs)
+                        _ , preds = torch.max(outputs.data , 1) # max index with row
+                        loss = criterion(outputs, labels)
+                        test_loss += loss.data[0]
+                        test_corrects += torch.sum(preds == labels.data)
+                        print("\ntest_corrects : ", test_corrects)
+            
+                        
+                # statistics
+                epoch_training_loss = training_loss/len_data_loader['train']   
+                epoch_training_acc = training_corrects/len_data_loader['train']   
+                epoch_test_loss = test_loss/len_data_loader['val']     
+                epoch_test_acc = test_corrects/len_data_loader['val']  
+                if phase =='train':
+                    print('\n len of svhn train dataset :{}'.format(len_data_loader['train']))
+                    print('\n{} Loss : {:.8f} Acc : {:.4f}'.format(phase, epoch_training_loss, epoch_training_acc))
+                else:
+                    print('\n len of svhn test dataset :{}'.format(len_data_loader['val'] ))
+                    print('\n{} Loss : {:.4f} Acc : {:.4f}'.format(phase, epoch_test_loss, epoch_test_acc))
+                # deep copy the model
+                if phase == 'val' and epoch_test_acc > best_acc:
+                    best_acc = epoch_test_acc
+                    is_best = best_acc
+                    #
+                    # best_model = copy.deepcopy(model)
+                    # save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
+        print()
+        
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(
+    time_elapsed // 60, time_elapsed % 60))
+    print('Best val test Acc: {:4f}'.format(best_acc))
+    return best_model
+
+
+def train_model_v2(model, criterion, optimizer, num_epochs):
+    since = time.time()
+    
+    best_model= model
+    best_acc = 0.0
+    if os.path.isfile(config.svhn_trainedmodel):
+        print("=> loading checkpoint '{}'".format(config.svhn_trainedmodel))
+        checkpoint = torch.load(config.svhn_trainedmodel)
+        best_model.load_state_dict(checkpoint['state_dict']) # fixed weight , bias for network 
+    
+    if not os.path.isfile(config.svhn_trainedmodel):
+        
+        print('\nTrain Epoch {}'.format(num_epochs))
+        print('--------------------------------------------')
+            
+        # Each epoch has a training and validation phase
+        
+        model.train()
+        #model.train(True)
+
+        running_loss =0.0
+        running_corrects = 0
+                
+        #Iterate over data.
+        for data in data_loader['train']:
+            # get the inputs
+            inputs, labels = data
+            labels = labels.type(torch.LongTensor)       
+            labels = labels.long().squeeze() # from svhan labels byte to long and reform size 4x1 to size 4      
+            inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
+            # zero the parameter gradients
+            optimizer.zero_grad()       
+            # forward 
+            outputs = model(inputs)
+
+            _ , preds = torch.max(outputs.data , 1) # max index with row
+
+                    
+            loss = criterion(outputs, labels)        
+            loss.backward()
+            optimizer.step()
+
+            running_loss = loss.data[0]
+            running_corrects += torch.sum(preds == labels.data)
+                    
+        # statistics
+        epoch_loss = running_loss/len_svhn_extra_train_loader   
+        epoch_acc = running_corrects /len_svhn_extra_train_loader 
+                
+        print('\nTrain Loss : {:.6f} Acc : {:.4f}'.format(epoch_loss, epoch_acc))
+                
+        # deep copy the model
+        if  epoch_acc > best_acc:
+            best_acc = epoch_acc
+            is_best = best_acc
+            best_model = copy.deepcopy(model)
+            # save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
+        print()
+        
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(
+    time_elapsed // 60, time_elapsed % 60))
+    print('Best val Acc: {:4f}'.format(best_acc))
+    return best_model
+
+def test_model_v2(model, criterion, optimizer, num_epochs):
+    since = time.time()
+    
+    best_model= model
+    best_acc = 0.0
+    if os.path.isfile(config.svhn_trainedmodel):
+        print("=> loading checkpoint '{}'".format(config.svhn_trainedmodel))
+        checkpoint = torch.load(config.svhn_trainedmodel)
+        best_model.load_state_dict(checkpoint['state_dict']) # fixed weight , bias for network 
+    
+    if not os.path.isfile(config.svhn_trainedmodel):
+        print('\nTest Epoch {}'.format(num_epochs))
+        print('--------------------------------------------')
+        test_loss =0.0
+        test_corrects = 0
+            
+        #Iterate over data.
+        for data in data_loader['val']:
+            # get the inputs
+            inputs, labels = data
+            labels = labels.type(torch.LongTensor)       
+            labels = labels.long().squeeze() # from svhan labels byte to long and reform size 4x1 to size 4      
+            inputs, labels = Variable(inputs.cuda(),  volatile=True), Variable(labels.cuda())
+                   
+            # forward 
+            outputs = model(inputs)
+            _ , preds = torch.max(outputs.data , 1) # max index with row                
+            loss = criterion(outputs, labels)
+
+
+            # statistics
+            test_loss += loss.data[0]
+            test_corrects += torch.sum(preds == labels.data)
+           # print('{} len_svhn_test:{:.4f}, loss :{:.4f}, acc:{:.4f}'.format(epoch, len_data_loader['val'] , test_loss, test_corrects))
+                 
+        # statistics
+        test_loss = test_loss/len_data_loader['val']   
+        test_corrects = test_corrects /len_data_loader['val']
+                
+        print('Test Loss : {:.4f} Acc : {:.4f}'.format(test_loss, test_corrects))
+                
+        # deep copy the model
+        if test_corrects > 0.9050:
+            best_acc = test_corrects
+            is_best = best_acc
+            best_model = copy.deepcopy(model)
+            save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
+        print()
+        
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(
+    time_elapsed // 60, time_elapsed % 60))
+    print('Best val Acc: {:4f}'.format(best_acc))
+
+def train_geneated_model_(model_generator, model_dicriminator,criterion, optimizer, num_epochs):
+    since = time.time()
+    
+    trained_svhn_dicscrimator_model= model_dicriminator
+    best_acc = 0.0
+    if os.path.isfile(config.svhn_trainedmodel):
+        print("=> loading checkpoint '{}'".format(config.svhn_trainedmodel))
+        checkpoint = torch.load(config.svhn_trainedmodel)
+        trained_svhn_dicscrimator_model.load_state_dict(checkpoint['state_dict']) # fixed weight , bias for network 
+    
+    if not os.path.isfile(config.svhn_trainedmodel):
+        for epoch in range(num_epochs):
+            print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+            print('--------------------------------------------')
+            
+            # Each epoch has a training and validation phase
+            for phase in ['train', 'val']:
+                if phase == 'train':
+                    model_generator.train()
+                    #model.train(True)
+                else:
+                    model_generator.eval()
+                    # model.train(False)
+                    
+                running_loss =0.0
+                running_corrects = 0
+                
+                #Iterate over data.
+                for data in data_loader[phase]:
+                    # get the inputs
+                    inputs, labels = data
+                    # print(model)
+                    # wrap them in Variable
+                    #if use_gpu:
+                    # intpus = model.to_var(inputs)
+                    # inputs = inputs.type(torch.FloatTensor),
+                    labels = labels.type(torch.LongTensor)       
+                    labels = labels.long().squeeze() # from svhan labels byte to long and reform size 4x1 to size 4      
+                    inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
+                    
+                    #else:
+                    #    inputs, labels = Variable(inputs), Variable(labels)
+    
+                    # zero the parameter gradients
+                    optimizer.zero_grad()
+                   
+                    # forward 
+                    fake_mnist = model_generator(inputs)
+                    # print('fake_mnist size : ', fake_mnist.size())
+                    outputs = trained_svhn_dicscrimator_model(fake_mnist)
+                    
+                    # print("-----------------outputs------------------------")
+                    # print(outputs)  # FloatTensor of size 4x10
+                    # print("-----------------labels------------------------")
+                    # print(labels)   # LongTensor of size 4
+                    _ , preds = torch.max(outputs.data , 1) # max index with row
+                    # print("-----------------prediction--------------------")
+                    # print(preds)    # LongTensor of size 4 
+                    
+                    loss = criterion(outputs, labels)
+                    # backward + optimize only if in training phase
+                    if phase == 'train':
+                        loss.backward()
+                        optimizer.step()
+                       #  print("loss" , loss)
+                    # statistics
+                    running_loss += loss.data[0]
+                    running_corrects += torch.sum(preds == labels.data)
+                    
+                # statistics
+                epoch_loss = running_loss/len_svhn_extra_train_loader   
+                epoch_acc = running_corrects /len_svhn_extra_train_loader 
+                
+                print('{} Loss : {:.4f} Acc : {:.4f}'.format(phase, epoch_loss, epoch_acc))
+                
+                # deep copy the model
+                if phase == 'val' and epoch_acc > best_acc:
+                    best_acc = epoch_acc
+                    is_best = best_acc
+                    #
+                    # best_model = copy.deepcopy(model)
+                    # save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
         print()
         
     time_elapsed = time.time() - since
@@ -304,20 +674,26 @@ if torch.cuda.is_available() :
     print("WARNING: You have a CUDA device, so you should probably run with --cuda")     
          
 #print("11")
-model_ft = model.D2().cuda()
+model_ft = model.G().cuda()
+model_ft2 = model.D1().cuda()
 #print("22")
 
 
 criterion = nn.CrossEntropyLoss()         
-optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
-
+# optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.0002, momentum=0.9)
+optimzer_ft = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
        
 # Train and Evaluate
 #print("33")
-model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
-   
-#print("44")
-                
+# model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
+# model_ft = test_model(model_ft, criterion, optimzer_ft, num_epochs=3)    
+
+model_ft = train_geneated_model_(model_ft, model_ft2, criterion, optimzer_ft, num_epochs=5)  
+"""
+for epoch in range(23):
+    train_model_v2(model_ft, criterion, optimzer_ft, epoch)
+    test_model_v2(model_ft, criterion, optimzer_ft, epoch)
+"""    
 best_prec_SVHN= 0
 
 if os.path.isfile(config.svhn_trainedmodel):
