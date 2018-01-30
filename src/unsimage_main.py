@@ -24,8 +24,7 @@ import os
 import argparse
 from dask.array.reductions import moment
 from torch import FloatTensor
-from bokeh.themes import default
-from Cython.Compiler.PyrexTypes import best_match
+
 
 
 parser = argparse.ArgumentParser()
@@ -40,7 +39,7 @@ config = parser.parse_args()
 print(config)
 print(config.mnist_path)
 
-
+"""
 image_ind = 33
 train_data = sio.loadmat('../datasets/svhn/train_32x32.mat')
 
@@ -80,7 +79,7 @@ plt.figure()
 plt.imshow(x_train[0][31])
 plt.pause(5) # pause a bit so that plots are updated
 print(y_train[image_ind])
-
+"""
 
 def get_loader(config):
     """Builds and returns Dataloader for MNIST and SVHN dataset."""
@@ -604,7 +603,7 @@ def test_model_v2(model, criterion, optimizer, num_epochs):
     time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
 
-def train_generated_model_(model_generator, model_dicriminator,criterion, optimizer, num_epochs):
+def train_generated_model_(model_generator, model_dicriminator,criterion, optimizer_g, optimizer_d, num_epochs):
     since = time.time()
     
     trained_svhn_dicscrimator_model= model_dicriminator
@@ -615,6 +614,7 @@ def train_generated_model_(model_generator, model_dicriminator,criterion, optimi
         trained_svhn_dicscrimator_model.load_state_dict(checkpoint['state_dict']) # fixed weight , bias for network 
     
     mnist_iter = iter(mnist_test_loader)
+
     svhn_iter = iter(svhn_test_loader)
     iter_per_epoch = min(len(svhn_iter), len(mnist_iter))
     if not os.path.isfile(config.svhn_trainedmodel):
@@ -648,29 +648,51 @@ def train_generated_model_(model_generator, model_dicriminator,criterion, optimi
                         svhn_iter = iter(svhn_test_loader)
                     
                     fixed_svhn = Variable(svhn_iter.next()[0].cuda()) 
-                   
+                    # print("svhn_iter.next()[0]  :", svhn_iter.next()[0])
+                    # print("-------------------------------------------------------")
                     # load svhn and mnist dataset
                     svhn, s_labels = svhn_iter.next() 
+
                     svhn, s_labels = Variable(svhn.cuda()), Variable(s_labels.cuda()).long().squeeze()
+                   # print("svhn size :", svhn.size(0))
+                   # print("-------------------------------------------------------")
                     mnist, m_labels = mnist_iter.next() 
-                    mnist, m_labels = Variable(mnist.cuda()), Variable(m_labels.cuda())
+                    mnist_3ch = torch.FloatTensor(mnist.size(0), 3, mnist.size(2), mnist.size(3))
+                    mnist_3ch[:,0,:,:].copy_(mnist)
+                    mnist_3ch[:,1,:,:].copy_(mnist)
+                    mnist_3ch[:,2,:,:].copy_(mnist)
+                    print(" mnist_3ch size :", mnist_3ch.size())
+                    
+                    mnist_3ch, m_labels = Variable(mnist_3ch.cuda()), Variable(m_labels.cuda())
+                    
+                    mnist_fake_labels = torch.Tensor(config.batch_size*svhn.size(0))
+                    mnist_fake_labels = Variable(mnist_fake_labels.cuda()).long()
+                    svhn_fake_labels = torch.Tensor(config.batch_size*mnist.size(0))
+                    svhn_fake_labels = Variable(svhn_fake_labels.cuda()).long()
                     
                     
-                    #else:
-                    #    inputs, labels = Variable(inputs), Variable(labels)
-    
+                    #######################Training D ##############################
+                    # train with real images
                     # zero the parameter gradients
-                    optimizer.zero_grad()
-                   
+                    optimizer_d.zero_grad()
+                    optimizer_g.zero_grad()
+            
+                    out = model_dicriminator(mnist_3ch)
+                    print("out size: ", out.size()) # [64 ,11]
+                    d1_loss = criterion(out, m_labels)
+                    d_mnist_loss = d1_loss
+                    
+                    # train with fake images
+                    
                     # forward 
                     fake_mnist = model_generator(svhn)
-                    # print('fake_mnist size : ', fake_mnist.size())
+                    print('fake_mnist size : ', fake_mnist.size())
                     outputs = trained_svhn_dicscrimator_model(fake_mnist)
-                    
+                    print('outputs fake_mnist size : ', fake_mnist.size())
                     reconst_svhn = model_generator(fixed_svhn)
-                    print("1 reconst_svhn size : ", reconst_svhn.size())
+                    #print("1 reconst_svhn size : ", reconst_svhn.size())
                     reconst_svhn = reconst_svhn.cpu().data.numpy()
-                    print("2 reconst_svhn size : ", reconst_svhn.shape)
+                    # print("2 reconst_svhn size : ", reconst_svhn.shape)
                     fixed_svhn = fixed_svhn.cpu().data.numpy()
                     
                     merged = merge_images(fixed_svhn, reconst_svhn)
@@ -722,20 +744,23 @@ if torch.cuda.is_available() :
          
 #print("11")
 model_ft = model.G().cuda()
-model_ft2 = model.D1().cuda()
+model_ft2 = model.D2().cuda()
 #print("22")
 
 
 criterion = nn.CrossEntropyLoss()         
 # optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.0002, momentum=0.9)
-optimzer_ft = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
+# optimzer_ft = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
+optimzer_g = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
+optimzer_d = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
+
        
 # Train and Evaluate
 #print("33")
 # model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
 # model_ft = test_model(model_ft, criterion, optimzer_ft, num_epochs=3)    
 
-model_ft = train_generated_model_(model_ft, model_ft2, criterion, optimzer_ft, num_epochs=5)  
+model_ft = train_generated_model_(model_ft, model_ft2, criterion, optimzer_g, optimzer_d, num_epochs=5)  
 """
 for epoch in range(23):
     train_model_v2(model_ft, criterion, optimzer_ft, epoch)
