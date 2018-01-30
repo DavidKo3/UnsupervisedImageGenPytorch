@@ -698,7 +698,7 @@ def train_generated_model_(model_generator, model_dicriminator1, model_dicrimina
                     
                     d1_loss = criterion(outputs, mnist_fake_labels)
                     
-                    
+                
                     # forward ( LD second term )
                     fake_svhn = model_generator(mnist_3ch)
                     print('fake_mnist size : ', fake_mnist.size())
