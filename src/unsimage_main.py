@@ -663,17 +663,24 @@ def train_generated_model_(model_generator, model_dicriminator1, model_dicrimina
                     mnist_3ch[:,0,:,:].copy_(mnist)
                     mnist_3ch[:,1,:,:].copy_(mnist)
                     mnist_3ch[:,2,:,:].copy_(mnist)
+                    mnist_3ch = Variable(mnist_3ch.cuda())
                     print(" mnist_3ch size :", mnist_3ch.size())
-                
-                    
-                    
+                      
                     mnist, m_labels = Variable(mnist.cuda()), Variable(m_labels.cuda())
+                    print(" mnist_3ch type:", mnist_3ch)
+                    print(" mnist type:", mnist)
+                    print(" mnist label type:", m_labels)
                     
+                    """
                     mnist_fake_labels = torch.Tensor(config.batch_size*svhn.size(0))
                     mnist_fake_labels = Variable(mnist_fake_labels.cuda()).long()
                     svhn_fake_labels = torch.Tensor(config.batch_size*mnist.size(0))
                     svhn_fake_labels = Variable(svhn_fake_labels.cuda()).long()
-                    
+                    """
+                    mnist_fake_labels = torch.zeros(config.batch_size)
+                    mnist_fake_labels = Variable(mnist_fake_labels.cuda()).long()
+                    svhn_fake_labels = torch.zeros(config.batch_size)
+                    svhn_fake_labels = Variable(svhn_fake_labels.cuda()).long()
                     
                     #######################Training D ##############################
                     # train with real images(mnist)
@@ -682,31 +689,36 @@ def train_generated_model_(model_generator, model_dicriminator1, model_dicrimina
                     optimizer_d2.zero_grad()
                     optimizer_d3.zero_grad()
                     optimizer_g.zero_grad()
-            
-                    out = model_dicriminator(mnist)
-                    print("out size: ", out.size()) # [64 ,11]
-                    d3_loss = criterion(out, m_labels)
-                    d_mnist_loss = d3_loss
                     
-                    # train with fake images
+                    # train with fake imagestt
                     
                     # forward ( LD first term )
                     fake_mnist = model_generator(svhn)
-                    print('fake_mnist size : ', fake_mnist.size())
+                    #print(' 1 fake_mnist size : ', fake_mnist.size())
                     outputs = model_dicriminator1(fake_mnist)
-                    print('outputs fake_mnist size : ', fake_mnist.size())
-                    
+                    #print('2 outputs fake_mnist size : ', outputs.size())
+                    #print('2 outputs fake_mnist_labels type : ', mnist_fake_labels)
+                    #print("2-1------------------------------------")
                     d1_loss = criterion(outputs, mnist_fake_labels)
+                    #print("2-2------------------------------------")
+                    
+                    
                     
                     # forward ( LD second term )
                     fake_svhn = model_generator(mnist_3ch)
-                    print('fake_mnist size : ', fake_mnist.size())
-                    outputs = model_dicriminator2(fake_mnist)
-                    print('outputs fake_mnist size : ', fake_mnist.size())
+                    # print('3 fake_svhn size : ', fake_svhn.size())   # torch.Size([64, 1, 32, 32])
+                    outputs = model_dicriminator2(fake_svhn)    
+                    # print('4 outputs fake_svhn size : ', outputs.size())    # torch.Size([64, 11])
                     
-                    d2_loss = criterion(outputs, mnist_fake_labels)
+                    d2_loss = criterion(outputs, svhn_fake_labels)
                     
-                    
+                    # forward ( LD last term )
+                   
+                    real_mnist = model_dicriminator3(mnist)
+                    # print('5 outputs mnist size : ', real_mnist.size())
+                    d3_loss = criterion(real_mnist, m_labels)
+                    # print("6 sdfsdfsdfsdfsdfsdf")
+                
                     
                     reconst_svhn = model_generator(fixed_svhn)
                     #print("1 reconst_svhn size : ", reconst_svhn.size())
@@ -730,7 +742,9 @@ def train_generated_model_(model_generator, model_dicriminator1, model_dicrimina
                     if phase == 'train':
                         loss.backward()
                         optimizer_g.step()
-                        optimizer_d.step()
+                        optimizer_d1.step()
+                        optimizer_d2.step()
+                        optimizer_d3.step()
                        #  print("loss" , loss)
                     # statistics
                     running_loss += loss.data[0]
@@ -774,9 +788,9 @@ criterion = nn.CrossEntropyLoss()
 # optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.0002, momentum=0.9)
 # optimzer_ft = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
 optimzer_g = optim.Adam(model_gen.parameters(), 0.02, [0.5, 0.9999])
-optimzer_d1 = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
-optimzer_d2 = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
-optimzer_d3 = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
+optimzer_d1 = optim.Adam(model_disc_1.parameters(), 0.02, [0.5, 0.9999])
+optimzer_d2 = optim.Adam(model_disc_2.parameters(), 0.02, [0.5, 0.9999])
+optimzer_d3 = optim.Adam(model_disc_3.parameters(), 0.02, [0.5, 0.9999])
        
 # Train and Evaluate
 #print("33")
