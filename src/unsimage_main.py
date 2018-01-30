@@ -603,10 +603,10 @@ def test_model_v2(model, criterion, optimizer, num_epochs):
     time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
 
-def train_generated_model_(model_generator, model_dicriminator,criterion, optimizer_g, optimizer_d, num_epochs):
+def train_generated_model_(model_generator, model_dicriminator1, model_dicriminator2 , model_dicriminator3, criterion, optimizer_g, optimizer_d1, optimizer_d2,optimizer_d3,num_epochs):
     since = time.time()
     
-    trained_svhn_dicscrimator_model= model_dicriminator
+    # trained_svhn_dicscrimator_model= model_dicriminator
     best_acc = 0.0
     if os.path.isfile(config.svhn_trainedmodel):
         print("=> loading checkpoint '{}'".format(config.svhn_trainedmodel))
@@ -657,13 +657,17 @@ def train_generated_model_(model_generator, model_dicriminator,criterion, optimi
                    # print("svhn size :", svhn.size(0))
                    # print("-------------------------------------------------------")
                     mnist, m_labels = mnist_iter.next() 
+                    
+                    
                     mnist_3ch = torch.FloatTensor(mnist.size(0), 3, mnist.size(2), mnist.size(3))
                     mnist_3ch[:,0,:,:].copy_(mnist)
                     mnist_3ch[:,1,:,:].copy_(mnist)
                     mnist_3ch[:,2,:,:].copy_(mnist)
                     print(" mnist_3ch size :", mnist_3ch.size())
+                
                     
-                    mnist_3ch, m_labels = Variable(mnist_3ch.cuda()), Variable(m_labels.cuda())
+                    
+                    mnist, m_labels = Variable(mnist.cuda()), Variable(m_labels.cuda())
                     
                     mnist_fake_labels = torch.Tensor(config.batch_size*svhn.size(0))
                     mnist_fake_labels = Variable(mnist_fake_labels.cuda()).long()
@@ -672,23 +676,39 @@ def train_generated_model_(model_generator, model_dicriminator,criterion, optimi
                     
                     
                     #######################Training D ##############################
-                    # train with real images
+                    # train with real images(mnist)
                     # zero the parameter gradients
-                    optimizer_d.zero_grad()
+                    optimizer_d1.zero_grad()
+                    optimizer_d2.zero_grad()
+                    optimizer_d3.zero_grad()
                     optimizer_g.zero_grad()
             
-                    out = model_dicriminator(mnist_3ch)
+                    out = model_dicriminator(mnist)
                     print("out size: ", out.size()) # [64 ,11]
-                    d1_loss = criterion(out, m_labels)
-                    d_mnist_loss = d1_loss
+                    d3_loss = criterion(out, m_labels)
+                    d_mnist_loss = d3_loss
                     
                     # train with fake images
                     
-                    # forward 
+                    # forward ( LD first term )
                     fake_mnist = model_generator(svhn)
                     print('fake_mnist size : ', fake_mnist.size())
-                    outputs = trained_svhn_dicscrimator_model(fake_mnist)
+                    outputs = model_dicriminator1(fake_mnist)
                     print('outputs fake_mnist size : ', fake_mnist.size())
+                    
+                    d1_loss = criterion(outputs, mnist_fake_labels)
+                    
+                    
+                    # forward ( LD second term )
+                    fake_svhn = model_generator(mnist_3ch)
+                    print('fake_mnist size : ', fake_mnist.size())
+                    outputs = model_dicriminator2(fake_mnist)
+                    print('outputs fake_mnist size : ', fake_mnist.size())
+                    
+                    d2_loss = criterion(outputs, mnist_fake_labels)
+                    
+                    
+                    
                     reconst_svhn = model_generator(fixed_svhn)
                     #print("1 reconst_svhn size : ", reconst_svhn.size())
                     reconst_svhn = reconst_svhn.cpu().data.numpy()
@@ -710,7 +730,8 @@ def train_generated_model_(model_generator, model_dicriminator,criterion, optimi
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
-                        optimizer.step()
+                        optimizer_g.step()
+                        optimizer_d.step()
                        #  print("loss" , loss)
                     # statistics
                     running_loss += loss.data[0]
@@ -743,24 +764,27 @@ if torch.cuda.is_available() :
     print("WARNING: You have a CUDA device, so you should probably run with --cuda")     
          
 #print("11")
-model_ft = model.G().cuda()
-model_ft2 = model.D2().cuda()
+model_gen = model.G().cuda()
+model_disc_1 = model.D1().cuda()
+model_disc_2 = model.D1().cuda()
+model_disc_3 = model.D1().cuda()
 #print("22")
 
 
 criterion = nn.CrossEntropyLoss()         
 # optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.0002, momentum=0.9)
 # optimzer_ft = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
-optimzer_g = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
-optimzer_d = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
-
+optimzer_g = optim.Adam(model_gen.parameters(), 0.02, [0.5, 0.9999])
+optimzer_d1 = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
+optimzer_d2 = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
+optimzer_d3 = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
        
 # Train and Evaluate
 #print("33")
 # model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
 # model_ft = test_model(model_ft, criterion, optimzer_ft, num_epochs=3)    
 
-model_ft = train_generated_model_(model_ft, model_ft2, criterion, optimzer_g, optimzer_d, num_epochs=5)  
+model_ft = train_generated_model_(model_gen, model_disc_1, model_disc_2,model_disc_3,criterion, optimzer_g, optimzer_d1, optimzer_d2,optimzer_d3,num_epochs=5)  
 """
 for epoch in range(23):
     train_model_v2(model_ft, criterion, optimzer_ft, epoch)
