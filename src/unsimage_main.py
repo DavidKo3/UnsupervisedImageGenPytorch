@@ -736,11 +736,6 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     optimizer_d.step()
                     
                 
-                    
-                    
-                    
-                    
-                
                     """
                     reconst_svhn = model_generator(fixed_svhn)
                     #print("1 reconst_svhn size : ", reconst_svhn.size())
