@@ -708,11 +708,11 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     d_real_target_loss.backward()
                     
                     # forward ( LD second term )
-                    encoded_mnist = model_encoder(mnist)
+                    encoded_mnist = model_encoder(mnist_3ch)
                     faked_mnist = model_generator(encoded_mnist)
                     generated_faked_mnist = faked_mnist.detach()
                     outputs_faked_mnist = model_disc(generated_faked_mnist)
-                    label_disc.data.fill_(fake_target_label_label)
+                    label_disc.data.fill_(fake_target_label)
                     d_fake_target_loss = criterion(outputs_faked_mnist, label_disc)
                     d_fake_target_loss.backward()
                     
@@ -733,7 +733,7 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     print("d_faked_src_loss :", d_faked_src_loss)
                     d_faked_src_loss.backward()
                     
-                    # update paramters to max_disc
+                    # update paramters to max_discriminator
                     optimizer_d.step()
                     
                 
@@ -741,35 +741,8 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     
                     
                     
-                    """
-                    fake_mnist = model_generator(svhn)
-                    print(' 1 fake_mnist size : ', fake_mnist.size())
-                    outputs = model_dicriminator1(fake_mnist)
-                    print('2 outputs fake_mnist size : ', outputs.size())
-                    print('2 outputs fake_mnist_labels type : ', mnist_fake_labels)
-                    print("2-1------------------------------------")
-                    d1_loss = criterion(outputs, mnist_fake_labels)
-                    print("2-2------------------------------------")
-                    
-                    
-                    
-                    
-                    # forward ( LD second term )
-                    fake_svhn = model_generator(mnist_3ch)
-                    # print('3 fake_svhn size : ', fake_svhn.size())   # torch.Size([64, 1, 32, 32])
-                    outputs = model_dicriminator2(fake_svhn)    
-                    # print('4 outputs fake_svhn size : ', outputs.size())    # torch.Size([64, 11])
-                    
-                    d2_loss = criterion(outputs, svhn_fake_labels)
-                    
-                    # forward ( LD last term )
-                   
-                    real_mnist = model_dicriminator3(mnist)
-                    # print('5 outputs mnist size : ', real_mnist.size())
-                    d3_loss = criterion(real_mnist, m_labels)
-                    # print("6 sdfsdfsdfsdfsdfsdf")
                 
-                    
+                    """
                     reconst_svhn = model_generator(fixed_svhn)
                     #print("1 reconst_svhn size : ", reconst_svhn.size())
                     reconst_svhn = reconst_svhn.cpu().data.numpy()
