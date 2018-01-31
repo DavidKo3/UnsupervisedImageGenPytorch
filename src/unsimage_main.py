@@ -716,7 +716,6 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     d_fake_target_loss = criterion(outputs_faked_mnist, label_disc)
                     d_fake_target_loss.backward()
                     
-                    
                     # forward ( LD first term )
                     encoded_svhn = model_encoder(svhn)
                     #print(' 1 fake_mnist size : ', encoded_mnist.size()) # [64, 128, 1, 1]
