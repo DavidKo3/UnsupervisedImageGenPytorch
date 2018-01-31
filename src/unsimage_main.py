@@ -603,7 +603,7 @@ def test_model_v2(model, criterion, optimizer, num_epochs):
     time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
 
-def train_generated_model_(model_generator, model_dicriminator1, model_dicriminator2 , model_dicriminator3, criterion, optimizer_g, optimizer_d1, optimizer_d2,optimizer_d3,num_epochs):
+def train_generated_model_(model_generator, model_encoder, model_disc , model_dicriminator2, criterion, optimizer_g, optimizer_d,num_epochs):
     since = time.time()
     
     # trained_svhn_dicscrimator_model= model_dicriminator
@@ -677,30 +677,80 @@ def train_generated_model_(model_generator, model_dicriminator1, model_dicrimina
                     svhn_fake_labels = torch.Tensor(config.batch_size*mnist.size(0))
                     svhn_fake_labels = Variable(svhn_fake_labels.cuda()).long()
                     """
+                    """
                     mnist_fake_labels = torch.zeros(config.batch_size)
                     mnist_fake_labels = Variable(mnist_fake_labels.cuda()).long()
                     svhn_fake_labels = torch.zeros(config.batch_size)
                     svhn_fake_labels = Variable(svhn_fake_labels.cuda()).long()
+                    """
+                    label_disc = torch.LongTensor(config.batch_size)
+                    label_disc = Variable(label_disc.cuda()).long()
+                    label_gen = torch.LongTensor(config.batch_size)
+                    label_gen = Variable(label_gen.cuda()).long()
+                    
+                    
+                    fake_source_label = 0
+                    fake_target_label = 1
+                    real_target_label = 2 
                     
                     #######################Training D ##############################
                     # train with real images(mnist)
                     # zero the parameter gradients
-                    optimizer_d1.zero_grad()
-                    optimizer_d2.zero_grad()
-                    optimizer_d3.zero_grad()
+                    optimizer_d.zero_grad()
                     optimizer_g.zero_grad()
                     
                     # train with fake imagestt
                     
+                    # forward (LD last term )
+                    label_disc.data.resize_(config.batch_size).fill_(real_target_label)
+                    out_real_mnist = model_disc(mnist)
+                    d_real_target_loss = criterion(out_real_mnist, label_disc)
+                    d_real_target_loss.backward()
+                    
+                    # forward ( LD second term )
+                    encoded_mnist = model_encoder(mnist)
+                    faked_mnist = model_generator(encoded_mnist)
+                    generated_faked_mnist = faked_mnist.detach()
+                    outputs_faked_mnist = model_disc(generated_faked_mnist)
+                    label_disc.data.fill_(fake_target_label_label)
+                    d_fake_target_loss = criterion(outputs_faked_mnist, label_disc)
+                    d_fake_target_loss.backward()
+                    
+                    
                     # forward ( LD first term )
-                    fake_mnist = model_generator(svhn)
-                    #print(' 1 fake_mnist size : ', fake_mnist.size())
-                    outputs = model_dicriminator1(fake_mnist)
-                    #print('2 outputs fake_mnist size : ', outputs.size())
-                    #print('2 outputs fake_mnist_labels type : ', mnist_fake_labels)
-                    #print("2-1------------------------------------")
-                    d1_loss = criterion(outputs, mnist_fake_labels)
+                    encoded_svhn = model_encoder(svhn)
+                    #print(' 1 fake_mnist size : ', encoded_mnist.size()) # [64, 128, 1, 1]
+                    faked_svhn = model_generator(encoded_svhn) # [64, 1, 32, 32]
+                    generated_faked_svhn = faked_svhn.detach()
+                    #print('2 outputs fake_mnist size : ', faked_mnist.size())
+                    outputs_faked_src = model_disc(generated_faked_svhn)
+                    
+                    #print('outputs_faked_src size : ', outputs_faked_src.size())
+                    label_disc.data.fill_(fake_source_label)
+                    # print('label_disc size : ', label_disc.size())
+                    d_faked_src_loss = criterion(outputs_faked_src, label_disc)
                     #print("2-2------------------------------------")
+                    print("d_faked_src_loss :", d_faked_src_loss)
+                    d_faked_src_loss.backward()
+                    
+                    # update paramters to max_disc
+                    optimizer_d.step()
+                    
+                
+                    
+                    
+                    
+                    
+                    """
+                    fake_mnist = model_generator(svhn)
+                    print(' 1 fake_mnist size : ', fake_mnist.size())
+                    outputs = model_dicriminator1(fake_mnist)
+                    print('2 outputs fake_mnist size : ', outputs.size())
+                    print('2 outputs fake_mnist_labels type : ', mnist_fake_labels)
+                    print("2-1------------------------------------")
+                    d1_loss = criterion(outputs, mnist_fake_labels)
+                    print("2-2------------------------------------")
+                    
                     
                     
                     
@@ -725,7 +775,7 @@ def train_generated_model_(model_generator, model_dicriminator1, model_dicrimina
                     reconst_svhn = reconst_svhn.cpu().data.numpy()
                     # print("2 reconst_svhn size : ", reconst_svhn.shape)
                     fixed_svhn = fixed_svhn.cpu().data.numpy()
-                    
+                    """
                     merged = merge_images(fixed_svhn, reconst_svhn)
                     path = os.path.join('./', 'sample-%d-m-s.png' %(step+1))
                     scipy.misc.imsave(path, merged)
@@ -742,9 +792,7 @@ def train_generated_model_(model_generator, model_dicriminator1, model_dicrimina
                     if phase == 'train':
                         loss.backward()
                         optimizer_g.step()
-                        optimizer_d1.step()
-                        optimizer_d2.step()
-                        optimizer_d3.step()
+                        optimizer_d.step()
                        #  print("loss" , loss)
                     # statistics
                     running_loss += loss.data[0]
@@ -777,10 +825,10 @@ if torch.cuda.is_available() :
     print("WARNING: You have a CUDA device, so you should probably run with --cuda")     
          
 #print("11")
-model_gen = model.G().cuda()
-model_disc_1 = model.D1().cuda()
-model_disc_2 = model.D1().cuda()
-model_disc_3 = model.D1().cuda()
+model_gen = model.G1().cuda()
+model_encoder = model.E().cuda()
+model_disc = model.D1().cuda()
+model_disc_2 = model.D_SVHN().cuda()
 #print("22")
 
 
@@ -788,16 +836,16 @@ criterion = nn.CrossEntropyLoss()
 # optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.0002, momentum=0.9)
 # optimzer_ft = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
 optimzer_g = optim.Adam(model_gen.parameters(), 0.02, [0.5, 0.9999])
-optimzer_d1 = optim.Adam(model_disc_1.parameters(), 0.02, [0.5, 0.9999])
-optimzer_d2 = optim.Adam(model_disc_2.parameters(), 0.02, [0.5, 0.9999])
-optimzer_d3 = optim.Adam(model_disc_3.parameters(), 0.02, [0.5, 0.9999])
+optimzer_disc = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
+# optimzer_d2 = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
+# optimzer_d3 = optim.Adam(model_disc_2.parameters(), 0.02, [0.5, 0.9999])
        
 # Train and Evaluate
 #print("33")
 # model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
 # model_ft = test_model(model_ft, criterion, optimzer_ft, num_epochs=3)    
-
-model_ft = train_generated_model_(model_gen, model_disc_1, model_disc_2,model_disc_3,criterion, optimzer_g, optimzer_d1, optimzer_d2,optimzer_d3,num_epochs=5)  
+model_ft = train_generated_model_(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, optimzer_g, optimzer_disc,num_epochs=5)
+# model_ft = train_generated_model_(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, optimzer_g, optimzer_d1, optimzer_d2,optimzer_d3,num_epochs=5)  
 """
 for epoch in range(23):
     train_model_v2(model_ft, criterion, optimzer_ft, epoch)
