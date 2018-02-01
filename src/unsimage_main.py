@@ -606,7 +606,7 @@ def test_model_v2(model, criterion, optimizer, num_epochs):
     time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
 
-def train_generated_model_(model_generator, model_encoder, model_disc , model_dicriminator2, criterion, criterionMSE, optimizer_g, optimizer_d,num_epochs):
+def train_generated_model_(model_generator, model_encoder, model_disc , model_dicriminator2, criterion, criterionMSE, optimizer_g, optimizer_d,num_epochs=1):
     since = time.time()
     
     # trained_svhn_dicscrimator_model= model_dicriminator
@@ -616,10 +616,12 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
         checkpoint = torch.load(config.svhn_trainedmodel)
         trained_svhn_dicscrimator_model.load_state_dict(checkpoint['state_dict']) # fixed weight , bias for network 
     
-    mnist_iter = iter(mnist_test_loader)
+    mnist_iter = iter(mnist_train_loader)
 
-    svhn_iter = iter(svhn_test_loader)
+    svhn_iter = iter(svhn_extra_train_loader)
     iter_per_epoch = min(len(svhn_iter), len(mnist_iter))
+    print('iter_per_epoch :{}'.format(iter_per_epoch))
+    
     if not os.path.isfile(config.svhn_trainedmodel):
         for epoch in range(num_epochs):
             print('Epoch {}/{}'.format(epoch, num_epochs - 1))
@@ -635,14 +637,16 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
             running_corrects = 0
                 
             #Iterate over data.
-            for step in range(40000):
+            for step in range(iter_per_epoch-1 ):
                  # get the inputs
                 # inputs, labels = data
                  # reset data_iter for each epoch
+                """
                 if (step+1) % iter_per_epoch == 0:
                     mnist_iter = iter(mnist_test_loader)
                     svhn_iter = iter(svhn_test_loader)
-                    
+                """
+                
                 fixed_svhn = Variable(svhn_iter.next()[0].cuda()) 
                 # print("svhn_iter.next()[0]  :", svhn_iter.next()[0])
                 # print("-------------------------------------------------------")
@@ -764,7 +768,7 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                 Loss_CONST.backward(retain_variables=True)
                     
                 # computation for LTID
-                Loss_TID = criterionMSE(faked_mnist,mnist)
+                Loss_TID = criterionMSE(faked_mnist, mnist)
                 Loss_TID = config.betaCONST*Loss_TID
                 Loss_TID.backward(retain_variables=True)
                     
@@ -781,25 +785,26 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     
                 # Loss G 
                 Loss_G =  loss_gan_src + loss_gan_target
-                print(" loss_gan_src : ",loss_gan_src )
-                print(" loss_gan_target : ",loss_gan_target )
+               # print(" loss_gan_src : ",loss_gan_src )
+               #  print(" loss_gan_target : ",loss_gan_target )
                 # update parameters 
                 optimizer_g.step()
                 
-                L_D = Loss_D.cpu().data.numpy()
-                L_G = Loss_G.cpu().data.numpy()
-                L_con = Loss_CONST.cpu().data.numpy()
-                L_tid = Loss_TID.cpu().data.numpy()
+                #L_D = Loss_D.cpu().data.numpy()
+                #L_G = Loss_G.cpu().data.numpy()
+                #L_con = Loss_CONST.cpu().data.numpy()
+                # L_tid = Loss_TID.cpu().data.numpy()
                 print("\n================================================================================")   
-                print('\n iter : {} Loss_D :{} , Loss_G :{} , Loss_CONST :{} , Loss_TID :{}'.format(step, L_D, L_G, L_con, L_tid))
-                # print('\n iter : {} Loss_D :{} , Loss_G :{} , Loss_CONST :{} , Loss_TID :{}'.format(step, Loss_D.data, Loss_G.data,Loss_CONST.data ,Loss_TID.data))
+                #print('\n  epoch :{} , step :{}, Loss_D :{} , Loss_G :{} , Loss_CONST :{} , Loss_TID :{}'.format(epoch, step, L_D, L_G, L_con, L_tid))
+                print('\n epoch :{} , step :{}, Loss_D :{} , Loss_G :{} , Loss_CONST :{} , Loss_TID :{}'.format(epoch , step, Loss_D.data[0], Loss_G.data[0],Loss_CONST.data[0] ,Loss_TID.data[0]))
                 print("\n================================================================================")  
-                
-                err_Loss_D, err_Loss_G = np.abs(3 -L_D),  np.abs(4 -L_G)
+                err_Loss_D, err_Loss_G = np.abs(3 -Loss_D.data[0]),  np.abs(4 -Loss_G.data[0])
+                # err_Loss_D, err_Loss_G = np.abs(3 -L_D),  np.abs(4 -L_G)
                 
                 
                 if(err_Loss_D <0.000005 and err_Loss_G <0.00005 ):
-                    print("\n best Loss_D :{}, Loss_G :{}".format(L_D, L_G))
+                    print("\n best Loss_D :{}, Loss_G :{}".format(Loss_D.data[0], Loss_G.data[0]))
+                    # print("\n best Loss_D :{}, Loss_G :{}".format(L_D, L_G))
                 
                 """ 
                 reconst_svhn = model_generator(fixed_svhn)
@@ -827,7 +832,7 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
     print('Training complete in {:.0f}m {:.0f}s'.format(
     time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
-    return best_model
+    # return best_model
 
 use_gpu = torch.cuda.is_available()
     
