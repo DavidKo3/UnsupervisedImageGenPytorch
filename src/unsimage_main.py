@@ -32,6 +32,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--arch', type=str, default='svhnDiscrimanator')
 parser.add_argument('--alphaCONST', type=float, default=15, help='alpha weight')
+parser.add_argument('--betaCONST', type=float, default=15, help='alpha weight')
 parser.add_argument('--startepoch', type=int, default=0)
 parser.add_argument('--image_size', type=int, default=32)
 parser.add_argument('--svhn_path', type=str, default='./datasets/svhn')
@@ -625,183 +626,193 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
             print('--------------------------------------------')
             
             # Each epoch has a training and validation phase
-            for phase in ['train', 'val']:
-                if phase == 'train':
-                    model_generator.train()
-                    #model.train(True)
-                else:
-                    model_generator.eval()
-                    # model.train(False)
-                       
-                                                     
-                running_loss =0.0
-                running_corrects = 0
+        
+            model_generator.train()
+            model_encoder.eval()
+            model_disc.train()
+              
+            running_loss =0.0
+            running_corrects = 0
                 
-                
-                
-                
-                #Iterate over data.
-                for step in range(40000):
-                    # get the inputs
-                    # inputs, labels = data
-                    # reset data_iter for each epoch
-                    if (step+1) % iter_per_epoch == 0:
-                        mnist_iter = iter(mnist_test_loader)
-                        svhn_iter = iter(svhn_test_loader)
+            #Iterate over data.
+            for step in range(40000):
+                 # get the inputs
+                # inputs, labels = data
+                 # reset data_iter for each epoch
+                if (step+1) % iter_per_epoch == 0:
+                    mnist_iter = iter(mnist_test_loader)
+                    svhn_iter = iter(svhn_test_loader)
                     
-                    fixed_svhn = Variable(svhn_iter.next()[0].cuda()) 
-                    # print("svhn_iter.next()[0]  :", svhn_iter.next()[0])
-                    # print("-------------------------------------------------------")
-                    # load svhn and mnist dataset
-                    svhn, s_labels = svhn_iter.next() 
-                    s_labels -= 1 # svhn ranged from 1 to 10
-                    svhn, s_labels = Variable(svhn.cuda()), Variable(s_labels.cuda()).long().squeeze()
-                   # print("svhn size :", svhn.size(0))
-                   # print("-------------------------------------------------------")
-                    mnist, m_labels = mnist_iter.next() 
+                fixed_svhn = Variable(svhn_iter.next()[0].cuda()) 
+                # print("svhn_iter.next()[0]  :", svhn_iter.next()[0])
+                # print("-------------------------------------------------------")
+                # load svhn and mnist dataset
+                svhn, s_labels = svhn_iter.next() 
+                s_labels -= 1 # svhn ranged from 1 to 10
+                svhn, s_labels = Variable(svhn.cuda()), Variable(s_labels.cuda()).long().squeeze()
+                # print("svhn size :", svhn.size(0))
+                # print("-------------------------------------------------------")
+                mnist, m_labels = mnist_iter.next() 
                     
                     
-                    mnist_3ch = torch.FloatTensor(mnist.size(0), 3, mnist.size(2), mnist.size(3))
-                    mnist_3ch[:,0,:,:].copy_(mnist)
-                    mnist_3ch[:,1,:,:].copy_(mnist)
-                    mnist_3ch[:,2,:,:].copy_(mnist)
-                    mnist_3ch = Variable(mnist_3ch.cuda())
-                    print(" mnist_3ch size :", mnist_3ch.size())
+                mnist_3ch = torch.FloatTensor(mnist.size(0), 3, mnist.size(2), mnist.size(3))
+                mnist_3ch[:,0,:,:].copy_(mnist)
+                mnist_3ch[:,1,:,:].copy_(mnist)
+                mnist_3ch[:,2,:,:].copy_(mnist)
+                mnist_3ch = Variable(mnist_3ch.cuda())
+                #print(" mnist_3ch size :", mnist_3ch.size())
                       
-                    mnist, m_labels = Variable(mnist.cuda()), Variable(m_labels.cuda())
-                    print(" mnist_3ch type:", mnist_3ch)
-                    print(" mnist type:", mnist)
-                    print(" mnist label type:", m_labels)
+                mnist, m_labels = Variable(mnist.cuda()), Variable(m_labels.cuda())
+                #print(" mnist_3ch type:", mnist_3ch)
+                #print(" mnist type:", mnist)
+                #print(" mnist label type:", m_labels)
                     
-                    """
-                    mnist_fake_labels = torch.Tensor(config.batch_size*svhn.size(0))
-                    mnist_fake_labels = Variable(mnist_fake_labels.cuda()).long()
-                    svhn_fake_labels = torch.Tensor(config.batch_size*mnist.size(0))
-                    svhn_fake_labels = Variable(svhn_fake_labels.cuda()).long()
-                    """
-                    """
-                    mnist_fake_labels = torch.zeros(config.batch_size)
-                    mnist_fake_labels = Variable(mnist_fake_labels.cuda()).long()
-                    svhn_fake_labels = torch.zeros(config.batch_size)
-                    svhn_fake_labels = Variable(svhn_fake_labels.cuda()).long()
-                    """
-                    label_disc = torch.LongTensor(config.batch_size)
-                    label_disc = Variable(label_disc.cuda())
-                    label_gen = torch.LongTensor(config.batch_size)
-                    label_gen = Variable(label_gen.cuda())
-                    
-                    
-                    fake_source_label = 0
-                    fake_target_label = 1
-                    real_target_label = 2 
-                    
-                    #######################Training D ##############################
-                    # train with real images(mnist)
-                    # zero the parameter gradients
-                    optimizer_d.zero_grad()
-                    optimizer_g.zero_grad()
-                    
-                    # train with fake imagestt
-                    
-                    # forward (LD last term )
-                    label_disc.data.resize_(config.batch_size).fill_(real_target_label)
-                    out_real_mnist = model_disc(mnist)
-                    d_real_target_loss = criterion(out_real_mnist, label_disc)
-                    d_real_target_loss.backward()
-                    
-                    # forward ( LD second term )
-                    encoded_mnist = model_encoder(mnist_3ch)
-                    faked_mnist = model_generator(encoded_mnist)
-                    generated_faked_mnist = faked_mnist.detach()
-                    outputs_faked_mnist = model_disc(generated_faked_mnist)
-                    label_disc.data.fill_(fake_target_label)
-                    d_fake_target_loss = criterion(outputs_faked_mnist, label_disc)
-                    d_fake_target_loss.backward()
-                    
-                    # forward ( LD first term )
-                    encoded_svhn = model_encoder(svhn)
-                    #print(' 1 fake_mnist size : ', encoded_mnist.size()) # [64, 128, 1, 1]
-                    faked_svhn = model_generator(encoded_svhn) # [64, 1, 32, 32]
-                    generated_faked_svhn = faked_svhn.detach()
-                    #print('2 outputs fake_mnist size : ', faked_mnist.size())
-                    outputs_faked_src = model_disc(generated_faked_svhn)
+                """
+                mnist_fake_labels = torch.Tensor(config.batch_size*svhn.size(0))
+                mnist_fake_labels = Variable(mnist_fake_labels.cuda()).long()
+                svhn_fake_labels = torch.Tensor(config.batch_size*mnist.size(0))
+                svhn_fake_labels = Variable(svhn_fake_labels.cuda()).long()
+                """
+                """
+                mnist_fake_labels = torch.zeros(config.batch_size)
+                mnist_fake_labels = Variable(mnist_fake_labels.cuda()).long()
+                svhn_fake_labels = torch.zeros(config.batch_size)
+                svhn_fake_labels = Variable(svhn_fake_labels.cuda()).long()
+                """
+                label_disc = torch.LongTensor(config.batch_size)
+                label_disc = Variable(label_disc.cuda())
+                label_gen = torch.LongTensor(config.batch_size)
+                label_gen = Variable(label_gen.cuda())
                     
                     
-                    label_disc.data.fill_(fake_source_label)
-                    print('outputs_faked_src size : ', outputs_faked_src.size())
-                    print('label_disc size : ', label_disc.size())
-                    d_faked_src_loss = criterion(outputs_faked_src, label_disc)
-                    #print("2-2------------------------------------")
-                    print("d_faked_src_loss :", d_faked_src_loss)
-                    d_faked_src_loss.backward()
+                fake_source_label = 0
+                fake_target_label = 1
+                real_target_label = 2 
+               
+                # zero the parameter gradients
+                optimizer_d.zero_grad()
+                optimizer_g.zero_grad()
+                     
+                #######################Training GAND ##############################
+               
+                # NOTE: max_D first
+                for p in model_disc.parameters(): 
+                    p.requires_grad = True 
+                model_disc.zero_grad()
+
                     
-                    # Loss D
-                    Loss_D = d_real_target_loss + d_fake_target_loss + d_faked_src_loss
-                    # update paramters to max_discriminator
-                    optimizer_d.step()
+                # forward (LD last term )
+                label_disc.data.resize_(config.batch_size).fill_(real_target_label)
+                out_real_mnist = model_disc(mnist)
+                # print("out_real_mnist : ", out_real_mnist.size())
+                d_real_target_loss = criterion(out_real_mnist, label_disc)
+                # print("d_real_target_loss : ", d_real_target_loss)
+                d_real_target_loss.backward()
                     
-                    # prevent computing gradients of weights in Discriminator
-                    for p in model_disc.parameters():
-                        p.requires_grad = False
-                    model_generator.zero_grad()
-                   
-                    # compute L_CONST 
-                    label_gen.data.resize_(config.batch_size).copy_(s_labels.data)
-                    print("label_gen :" , label_gen.size())
-                    # print("label_gen :" , label_gen.data)
-                   
-                    faked_svhn_3ch = torch.FloatTensor(faked_svhn.size(0), 3, faked_svhn.size(2), faked_svhn.size(3))
-                    faked_svhn_3ch[:,0,:,:].copy_(faked_svhn.data)
-                    faked_svhn_3ch[:,1,:,:].copy_(faked_svhn.data)
-                    faked_svhn_3ch[:,2,:,:].copy_(faked_svhn.data)
-                    faked_svhn_3ch = Variable(faked_svhn_3ch.cuda())
-                   
-                   
-                    encoded_faked_svhn = model_encoder(faked_svhn_3ch)
-                    print("f(g(f(SVHN)) : ", encoded_faked_svhn.size())   #[64,128,1,1]
-                    print("encoded_svhn: ", encoded_svhn.size())
-                    # print("f(g(f(SVHN)) squeeze(): ", encoded_faked_svhn.squeeze().size())   #[64,128]
-                    # print("label_gen: ", label_gen.size())   #[64,128,1,1]
-                    loss_const = criterionMSE(encoded_faked_svhn, encoded_svhn.detach())
-                    print("loss_const : ", loss_const)
-                    loss_const = config.alphaCONST*loss_const
-                    loss_const.backward(retain_variables=True)
+                # forward ( LD second term )
+                encoded_mnist = model_encoder(mnist_3ch)
+                faked_mnist = model_generator(encoded_mnist)
+                generated_faked_mnist = faked_mnist.detach()
+                outputs_faked_mnist = model_disc(generated_faked_mnist)
+                label_disc.data.fill_(fake_target_label)
+                d_fake_target_loss = criterion(outputs_faked_mnist, label_disc)
+                d_fake_target_loss.backward()
                     
-                    """
-                    reconst_svhn = model_generator(fixed_svhn)
-                    #print("1 reconst_svhn size : ", reconst_svhn.size())
-                    reconst_svhn = reconst_svhn.cpu().data.numpy()
-                    # print("2 reconst_svhn size : ", reconst_svhn.shape)
-                    fixed_svhn = fixed_svhn.cpu().data.numpy()
-                    """
-                    merged = merge_images(fixed_svhn, reconst_svhn)
-                    path = os.path.join('./', 'sample-%d-m-s.png' %(step+1))
-                    scipy.misc.imsave(path, merged)
-                    # print("-----------------outputs------------------------")
-                    # print(outputs)  # FloatTensor of size 4x10
-                    # print("-----------------labels------------------------")
-                    # print(labels)   # LongTensor of size 4
-                    _ , preds = torch.max(outputs.data , 1) # max index with row
-                    # print("-----------------prediction--------------------")
-                    # print(preds)    # LongTensor of size 4 
+                # forward ( LD first term )
+                encoded_svhn = model_encoder(svhn)
+                #print(' 1 fake_mnist size : ', encoded_mnist.size()) # [64, 128, 1, 1]
+                faked_svhn = model_generator(encoded_svhn) # [64, 1, 32, 32]
+                generated_faked_svhn = faked_svhn.detach()
+                #print('2 outputs fake_mnist size : ', faked_mnist.size())
+                outputs_faked_src = model_disc(generated_faked_svhn)
                     
-                    loss = criterion(outputs, s_labels)
-                    # backward + optimize only if in training phase
-                    if phase == 'train':
-                        loss.backward()
-                        optimizer_g.step()
-                        optimizer_d.step()
-                       #  print("loss" , loss)
-                    # statistics
-                    running_loss += loss.data[0]
-                    running_corrects += torch.sum(preds == s_labels.data)
                     
-                # statistics
-                epoch_loss = running_loss/len_svhn_extra_train_loader   
-                epoch_acc = running_corrects /len_svhn_extra_train_loader 
+                label_disc.data.fill_(fake_source_label)
+                # print('outputs_faked_src size : ', outputs_faked_src.size())
+                #print('label_disc size : ', label_disc.size())
+                d_faked_src_loss = criterion(outputs_faked_src, label_disc)
+                #print("d_faked_src_loss :", d_faked_src_loss)
+                d_faked_src_loss.backward()
+                    
+                # Loss D
+                Loss_D = d_real_target_loss + d_fake_target_loss + d_faked_src_loss
+                # update paramters to max_discriminator
+                optimizer_d.step()
+                    
+                    
                 
-                print('{} Loss : {:.4f} Acc : {:.4f}'.format(phase, epoch_loss, epoch_acc))
+                # freeze computing gradients of weights in Discriminator
+                for p in model_disc.parameters():
+                    p.requires_grad = False
+                model_generator.zero_grad()
                 
+                   
+                # computation for LCONST
+                label_gen.data.resize_(config.batch_size).copy_(s_labels.data)
+                # print("label_gen :" , label_gen.size())
+                # print("label_gen :" , label_gen.data)
+                   
+                faked_svhn_3ch = torch.FloatTensor(faked_svhn.size(0), 3, faked_svhn.size(2), faked_svhn.size(3))
+                faked_svhn_3ch[:,0,:,:].copy_(faked_svhn.data)
+                faked_svhn_3ch[:,1,:,:].copy_(faked_svhn.data)
+                faked_svhn_3ch[:,2,:,:].copy_(faked_svhn.data)
+                faked_svhn_3ch = Variable(faked_svhn_3ch.cuda())
+            
+                encoded_faked_svhn = model_encoder(faked_svhn_3ch)
+                Loss_CONST = criterionMSE(encoded_faked_svhn, encoded_svhn.detach())
+                Loss_CONST = config.alphaCONST*Loss_CONST
+                Loss_CONST.backward(retain_variables=True)
+                    
+                # computation for LTID
+                Loss_TID = criterionMSE(faked_mnist,mnist)
+                Loss_TID = config.betaCONST*Loss_TID
+                Loss_TID.backward(retain_variables=True)
+                    
+                    
+                #######################Training GAND ##############################
+                label_disc.data.resize_(config.batch_size).fill_(real_target_label)
+                out_faked_src = model_disc(faked_svhn)
+                loss_gan_src = criterion(out_faked_src, label_disc)
+                loss_gan_src.backward()
+                    
+                out_faked_target = model_disc(faked_mnist)
+                loss_gan_target = criterion(out_faked_target, label_disc)
+                loss_gan_target.backward()
+                    
+                # Loss G 
+                Loss_G =  loss_gan_src + loss_gan_target
+                print(" loss_gan_src : ",loss_gan_src )
+                print(" loss_gan_target : ",loss_gan_target )
+                # update parameters 
+                optimizer_g.step()
+                
+                L_D = Loss_D.cpu().data.numpy()
+                L_G = Loss_G.cpu().data.numpy()
+                L_con = Loss_CONST.cpu().data.numpy()
+                L_tid = Loss_TID.cpu().data.numpy()
+                print("\n================================================================================")   
+                print('\n iter : {} Loss_D :{} , Loss_G :{} , Loss_CONST :{} , Loss_TID :{}'.format(step, L_D, L_G, L_con, L_tid))
+                # print('\n iter : {} Loss_D :{} , Loss_G :{} , Loss_CONST :{} , Loss_TID :{}'.format(step, Loss_D.data, Loss_G.data,Loss_CONST.data ,Loss_TID.data))
+                print("\n================================================================================")  
+                
+                err_Loss_D, err_Loss_G = np.abs(3 -L_D),  np.abs(4 -L_G)
+                
+                
+                if(err_Loss_D <0.000005 and err_Loss_G <0.00005 ):
+                    print("\n best Loss_D :{}, Loss_G :{}".format(L_D, L_G))
+                
+                """ 
+                reconst_svhn = model_generator(fixed_svhn)
+                #print("1 reconst_svhn size : ", reconst_svhn.size())
+                reconst_svhn = reconst_svhn.cpu().data.numpy()
+                # print("2 reconst_svhn size : ", reconst_svhn.shape)
+                fixed_svhn = fixed_svhn.cpu().data.numpy()
+                    
+                merged = merge_images(fixed_svhn, reconst_svhn)
+                path = os.path.join('./', 'sample-%d-m-s.png' %(step+1))
+                scipy.misc.imsave(path, merged)
+                
+
                 # deep copy the model
                 if phase == 'val' and epoch_acc > best_acc:
                     best_acc = epoch_acc
@@ -809,6 +820,7 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     #
                     # best_model = copy.deepcopy(model)
                     # save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
+                """
         print()
         
     time_elapsed = time.time() - since
