@@ -853,22 +853,14 @@ model_gen = model.G1().cuda()
 model_encoder = model.E().cuda()
 model_disc = model.D1().cuda()
 model_disc_2 = model.D_SVHN().cuda()
-#print("22")
 
 
 criterion = nn.CrossEntropyLoss()     
-criterionMSE = nn.MSELoss() # nn.L1Loss()    
-# optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.0002, momentum=0.9)
-# optimzer_ft = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
+criterionMSE = nn.MSELoss()  
+
 optimzer_g = optim.Adam(model_gen.parameters(), 0.02, betas= (config.beta1, 0.999))
 optimzer_disc = optim.Adam(model_disc.parameters(), 0.02, betas= (config.beta1, 0.999))
-# optimzer_d2 = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
-# optimzer_d3 = optim.Adam(model_disc_2.parameters(), 0.02, [0.5, 0.9999])
-       
-# Train and Evaluate
-#print("33")
-# model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
-# model_ft = test_model(model_ft, criterion, optimzer_ft, num_epochs=3)    
+  
 model_ft = train_generated_model_(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, criterionMSE, optimzer_g, optimzer_disc,num_epochs=1)
 # model_ft = train_generated_model_(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, optimzer_g, optimzer_d1, optimzer_d2,optimzer_d3,num_epochs=5)  
 """
