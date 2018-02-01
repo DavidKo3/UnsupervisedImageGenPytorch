@@ -807,18 +807,19 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     print("\n best Loss_D :{}, Loss_G :{}".format(Loss_D.data[0], Loss_G.data[0]))
                     # print("\n best Loss_D :{}, Loss_G :{}".format(L_D, L_G))
                 
-                """ 
-                reconst_svhn = model_generator(fixed_svhn)
+                fixed_encoded_svhn = model_encoder(fixed_svhn)
+                print("fixed_svhn shape :", fixed_svhn.size())
+                fixed_reconst_svhn = model_generator(fixed_encoded_svhn)
                 #print("1 reconst_svhn size : ", reconst_svhn.size())
-                reconst_svhn = reconst_svhn.cpu().data.numpy()
+                fixed_reconst_svhn = fixed_reconst_svhn.cpu().data.numpy()
                 # print("2 reconst_svhn size : ", reconst_svhn.shape)
                 fixed_svhn = fixed_svhn.cpu().data.numpy()
                     
-                merged = merge_images(fixed_svhn, reconst_svhn)
+                merged = merge_images(fixed_svhn, fixed_reconst_svhn)
                 path = os.path.join('./', 'sample-%d-m-s.png' %(step+1))
                 scipy.misc.imsave(path, merged)
                 
-
+                """
                 # deep copy the model
                 if phase == 'val' and epoch_acc > best_acc:
                     best_acc = epoch_acc
