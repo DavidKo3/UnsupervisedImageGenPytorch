@@ -24,12 +24,14 @@ import os
 import argparse
 from dask.array.reductions import moment
 from torch import FloatTensor
+from sqlalchemy.sql.util import criterion_as_pairs
 
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--arch', type=str, default='svhnDiscrimanator')
+parser.add_argument('--alphaCONST', type=float, default=15, help='alpha weight')
 parser.add_argument('--startepoch', type=int, default=0)
 parser.add_argument('--image_size', type=int, default=32)
 parser.add_argument('--svhn_path', type=str, default='./datasets/svhn')
@@ -603,7 +605,7 @@ def test_model_v2(model, criterion, optimizer, num_epochs):
     time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
 
-def train_generated_model_(model_generator, model_encoder, model_disc , model_dicriminator2, criterion, optimizer_g, optimizer_d,num_epochs):
+def train_generated_model_(model_generator, model_encoder, model_disc , model_dicriminator2, criterion, criterionMSE, optimizer_g, optimizer_d,num_epochs):
     since = time.time()
     
     # trained_svhn_dicscrimator_model= model_dicriminator
@@ -724,9 +726,10 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     #print('2 outputs fake_mnist size : ', faked_mnist.size())
                     outputs_faked_src = model_disc(generated_faked_svhn)
                     
-                    #print('outputs_faked_src size : ', outputs_faked_src.size())
+                    
                     label_disc.data.fill_(fake_source_label)
-                    # print('label_disc size : ', label_disc.size())
+                    print('outputs_faked_src size : ', outputs_faked_src.size())
+                    print('label_disc size : ', label_disc.size())
                     d_faked_src_loss = criterion(outputs_faked_src, label_disc)
                     #print("2-2------------------------------------")
                     print("d_faked_src_loss :", d_faked_src_loss)
@@ -745,8 +748,25 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     # compute L_CONST 
                     label_gen.data.resize_(config.batch_size).copy_(s_labels.data)
                     print("label_gen :" , label_gen.size())
-                    print("label_gen :" , label_gen.data)
+                    # print("label_gen :" , label_gen.data)
                    
+                    faked_svhn_3ch = torch.FloatTensor(faked_svhn.size(0), 3, faked_svhn.size(2), faked_svhn.size(3))
+                    faked_svhn_3ch[:,0,:,:].copy_(faked_svhn.data)
+                    faked_svhn_3ch[:,1,:,:].copy_(faked_svhn.data)
+                    faked_svhn_3ch[:,2,:,:].copy_(faked_svhn.data)
+                    faked_svhn_3ch = Variable(faked_svhn_3ch.cuda())
+                   
+                   
+                    encoded_faked_svhn = model_encoder(faked_svhn_3ch)
+                    print("f(g(f(SVHN)) : ", encoded_faked_svhn.size())   #[64,128,1,1]
+                    print("encoded_svhn: ", encoded_svhn.size())
+                    # print("f(g(f(SVHN)) squeeze(): ", encoded_faked_svhn.squeeze().size())   #[64,128]
+                    # print("label_gen: ", label_gen.size())   #[64,128,1,1]
+                    loss_const = criterionMSE(encoded_faked_svhn, encoded_svhn.detach())
+                    print("loss_const : ", loss_const)
+                    loss_const = config.alphaCONST*loss_const
+                    loss_const.backward(retain_variables=True)
+                    
                     """
                     reconst_svhn = model_generator(fixed_svhn)
                     #print("1 reconst_svhn size : ", reconst_svhn.size())
@@ -810,7 +830,8 @@ model_disc_2 = model.D_SVHN().cuda()
 #print("22")
 
 
-criterion = nn.CrossEntropyLoss()         
+criterion = nn.CrossEntropyLoss()     
+criterionMSE = nn.MSELoss() # nn.L1Loss()    
 # optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.0002, momentum=0.9)
 # optimzer_ft = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
 optimzer_g = optim.Adam(model_gen.parameters(), 0.02, [0.5, 0.9999])
@@ -822,7 +843,7 @@ optimzer_disc = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
 #print("33")
 # model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
 # model_ft = test_model(model_ft, criterion, optimzer_ft, num_epochs=3)    
-model_ft = train_generated_model_(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, optimzer_g, optimzer_disc,num_epochs=5)
+model_ft = train_generated_model_(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, criterionMSE, optimzer_g, optimzer_disc,num_epochs=5)
 # model_ft = train_generated_model_(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, optimzer_g, optimzer_d1, optimzer_d2,optimzer_d3,num_epochs=5)  
 """
 for epoch in range(23):
