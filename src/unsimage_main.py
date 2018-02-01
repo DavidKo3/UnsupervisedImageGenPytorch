@@ -31,8 +31,10 @@ from sqlalchemy.sql.util import criterion_as_pairs
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--arch', type=str, default='svhnDiscrimanator')
+parser.add_argument('--lr', type=float, default=0.02, help='learning rate, default=0.02')
+parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
 parser.add_argument('--alphaCONST', type=float, default=15, help='alpha weight')
-parser.add_argument('--betaCONST', type=float, default=15, help='alpha weight')
+parser.add_argument('--betaCONST', type=float, default=15, help='beta weight')
 parser.add_argument('--startepoch', type=int, default=0)
 parser.add_argument('--image_size', type=int, default=32)
 parser.add_argument('--svhn_path', type=str, default='./datasets/svhn')
@@ -817,7 +819,10 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                 fixed_svhn = fixed_svhn.cpu().data.numpy()
                     
                 merged = merge_images(fixed_svhn, fixed_reconst_svhn)
-                path = os.path.join('./', 'sample-%d-m-s.png' %(step+1))
+                path='./results/'
+                if not os.path.exists(path):
+                    os.mkdir(path)
+                path = os.path.join(path, 'sample-%d-m-s.png' %(step+1))
                 scipy.misc.imsave(path, merged)
                 
                 """
@@ -855,8 +860,8 @@ criterion = nn.CrossEntropyLoss()
 criterionMSE = nn.MSELoss() # nn.L1Loss()    
 # optimzer_ft = optim.SGD(model_ft.parameters(), lr=0.0002, momentum=0.9)
 # optimzer_ft = optim.Adam(model_ft.parameters(), 0.02, [0.5, 0.9999])
-optimzer_g = optim.Adam(model_gen.parameters(), 0.02, [0.5, 0.9999])
-optimzer_disc = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
+optimzer_g = optim.Adam(model_gen.parameters(), 0.02, betas= (config.beta1, 0.999))
+optimzer_disc = optim.Adam(model_disc.parameters(), 0.02, betas= (config.beta1, 0.999))
 # optimzer_d2 = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
 # optimzer_d3 = optim.Adam(model_disc_2.parameters(), 0.02, [0.5, 0.9999])
        
