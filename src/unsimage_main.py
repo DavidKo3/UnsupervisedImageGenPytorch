@@ -627,11 +627,12 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
             print('Epoch {}/{}'.format(epoch, num_epochs - 1))
             print('--------------------------------------------')
             
+            start =True
             # Each epoch has a training and validation phase
-        
-            model_generator.train()
-            model_encoder.eval()
-            model_disc.train()
+            if start == True:
+                model_generator.train()
+                model_encoder.eval()
+                model_disc.train()
               
             running_loss =0.0
             running_corrects = 0
@@ -826,6 +827,7 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     # best_model = copy.deepcopy(model)
                     # save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
                 """
+            start=False
         print()
         
     time_elapsed = time.time() - since
@@ -860,7 +862,7 @@ optimzer_disc = optim.Adam(model_disc.parameters(), 0.02, [0.5, 0.9999])
 #print("33")
 # model_ft = train_model(model_ft, criterion, optimzer_ft, num_epochs=5)    
 # model_ft = test_model(model_ft, criterion, optimzer_ft, num_epochs=3)    
-model_ft = train_generated_model_(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, criterionMSE, optimzer_g, optimzer_disc,num_epochs=5)
+model_ft = train_generated_model_(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, criterionMSE, optimzer_g, optimzer_disc,num_epochs=1)
 # model_ft = train_generated_model_(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, optimzer_g, optimzer_d1, optimzer_d2,optimzer_d3,num_epochs=5)  
 """
 for epoch in range(23):
