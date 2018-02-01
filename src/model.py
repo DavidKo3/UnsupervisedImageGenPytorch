@@ -39,7 +39,7 @@ class D1(nn.Module):
         self.conv3 = conv(conv_dim*2, conv_dim*4, 4)
         self.conv4 = conv(conv_dim*4, conv_dim*2, 6)
         # self.fc = nn.Linear(conv_dim*2 , 10) # feature size 128 x [2x2]
-        n_out = 11 if use_labels else 1
+        n_out = 10 if use_labels else 1
         self.fc = conv(conv_dim*2, n_out, 1, 1, 0, False)
 
     def forward(self, x):
@@ -87,7 +87,7 @@ class D_SVHN(nn.Module):
         self.conv2 = conv(conv_dim, conv_dim*2, 4)
         self.conv3 = conv(conv_dim*2, conv_dim*4, 4)
         self.conv4 = conv(conv_dim*4, conv_dim*2, 6)
-        n_out = 11 if use_labels else 1
+        n_out = 10 if use_labels else 1
         self.fc = conv(conv_dim*2, n_out, 1, 1, 0, False)
         
     def forward(self, x):

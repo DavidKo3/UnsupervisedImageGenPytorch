@@ -652,7 +652,7 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     # print("-------------------------------------------------------")
                     # load svhn and mnist dataset
                     svhn, s_labels = svhn_iter.next() 
-
+                    s_labels -= 1 # svhn ranged from 1 to 10
                     svhn, s_labels = Variable(svhn.cuda()), Variable(s_labels.cuda()).long().squeeze()
                    # print("svhn size :", svhn.size(0))
                    # print("-------------------------------------------------------")
@@ -684,9 +684,9 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     svhn_fake_labels = Variable(svhn_fake_labels.cuda()).long()
                     """
                     label_disc = torch.LongTensor(config.batch_size)
-                    label_disc = Variable(label_disc.cuda()).long()
+                    label_disc = Variable(label_disc.cuda())
                     label_gen = torch.LongTensor(config.batch_size)
-                    label_gen = Variable(label_gen.cuda()).long()
+                    label_gen = Variable(label_gen.cuda())
                     
                     
                     fake_source_label = 0
@@ -737,7 +737,16 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     # update paramters to max_discriminator
                     optimizer_d.step()
                     
-                
+                    # prevent computing gradients of weights in Discriminator
+                    for p in model_disc.parameters():
+                        p.requires_grad = False
+                    model_generator.zero_grad()
+                   
+                    # compute L_CONST 
+                    label_gen.data.resize_(config.batch_size).copy_(s_labels.data)
+                    print("label_gen :" , label_gen.size())
+                    print("label_gen :" , label_gen.data)
+                   
                     """
                     reconst_svhn = model_generator(fixed_svhn)
                     #print("1 reconst_svhn size : ", reconst_svhn.size())
