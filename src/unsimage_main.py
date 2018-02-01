@@ -732,6 +732,8 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                     print("d_faked_src_loss :", d_faked_src_loss)
                     d_faked_src_loss.backward()
                     
+                    # Loss D
+                    Loss_D = d_real_target_loss + d_fake_target_loss + d_faked_src_loss
                     # update paramters to max_discriminator
                     optimizer_d.step()
                     
