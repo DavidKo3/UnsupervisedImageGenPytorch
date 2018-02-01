@@ -767,12 +767,13 @@ def train_generated_model_(model_generator, model_encoder, model_disc , model_di
                 Loss_CONST = criterionMSE(encoded_faked_svhn, encoded_svhn.detach())
                 Loss_CONST = config.alphaCONST*Loss_CONST
                 Loss_CONST.backward(retain_variables=True)
-                    
+                  
+                  
                 # computation for LTID
                 Loss_TID = criterionMSE(faked_mnist, mnist)
                 Loss_TID = config.betaCONST*Loss_TID
                 Loss_TID.backward(retain_variables=True)
-                    
+                 
                     
                 #######################Training GAND ##############################
                 label_disc.data.resize_(config.batch_size).fill_(real_target_label)
