@@ -137,31 +137,20 @@ class E(nn.Module):
         self.conv3 = conv(conv_dim*2, conv_dim*4, 4)
         self.conv4 = conv(conv_dim*4, conv_dim*2, 6)
         # self.fc = nn.Linear(conv_dim*2 , 10) # feature size 128 x [2x2]
-       # n_out = 11 if use_labels else 1
-       # self.fc = conv(conv_dim*2, n_out, 1, 1, 0, False)
+        n_out = 10 if use_labels else 1
+        self.fc = conv(conv_dim*2, n_out, 1, 1, 0, False)
 
     def forward(self, x):
         out = F.relu(self.conv1(x))   # (?, 64, 16, 16)    , (32 + 2x1 - 4)/2+1 = 16
         out = F.relu(self.conv2(out))   # (?, 128, 8, 8)
         out = F.relu(self.conv3(out))   # (?, 256, 4, 4)
         out = F.relu(self.conv4(out))   # (?, 128, 1, 1)
-   
        # print("result of out :", out.size())
         # out = [4, 128, 2 ,2 ]
         # output size = (input soze + 2 x Padding - Filter size )/ Stride +1 
-       # (_, C, H, W) = out.data.size()
-       # print("before view out size :" , out.size())
-       # out = out.view( -1 , C * H * W)   
-       # print("after view out size :" , out.size())
-       # print("===================before squeeze out===========================")
-       # print(out) # [4, 128 ,2 , 2]
-        #print("===================before squeeze and fc(out) ===========================")
-        #print(self.fc(out).size()) # [4, 512]
-        # out = self.fc(out).squeeze()
-        #print("===================before squeeze out===========================")
-        #print(out) # [4, 512]
+        out2 = self.fc(out).squeeze()
 
-        return out
+        return out , out2
 
     
     

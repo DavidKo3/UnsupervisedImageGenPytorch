@@ -40,7 +40,7 @@ parser.add_argument('--startepoch', type=int, default=0)
 parser.add_argument('--image_size', type=int, default=32)
 parser.add_argument('--svhn_path', type=str, default='./datasets/svhn')
 parser.add_argument('--mnist_path', type=str , default='./datasets/mnist')
-parser.add_argument('--svhn_trainedmodel', type=str, default='./model_best.pth.tar')
+parser.add_argument('--svhn_trainedmodel', type=str, default='./svhn_extra_mnist_model_best.pth.tar')
 config = parser.parse_args()
 print(config)
 print(config.mnist_path)
@@ -399,7 +399,7 @@ def test_model(model, criterion, optimizer, num_epochs=1000):
     time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
 
-def train_test_model(model, criterion, optimizer, num_epochs=3):
+def train_test_model(model, criterion, optimizer, num_epochs=5):
     since = time.time()
     
     best_model= model
@@ -411,16 +411,15 @@ def train_test_model(model, criterion, optimizer, num_epochs=3):
     
     if not os.path.isfile(config.svhn_trainedmodel):
         
-        training_loss =0.0
-        training_corrects = 0
-        
-        test_loss =0.0
-        test_corrects = 0
+
         
         for epoch in range(num_epochs):
             print('Epoch {}/{}'.format(epoch, num_epochs - 1))
             print('--------------------------------------------')
-            
+            training_loss =0.0
+            training_corrects = 0
+            test_loss =0.0
+            test_corrects = 0
             # Each epoch has a training and validation phase
             for phase in ['train', 'val']:
                 if phase == 'train':
@@ -429,40 +428,41 @@ def train_test_model(model, criterion, optimizer, num_epochs=3):
                 else:
                     model.eval()
                     # model.train(False)
-                    
+                data_reloader = iter(data_loader[phase])
                 #Iterate over data.
-                for data in data_loader[phase]:
+                for step , data in enumerate(data_reloader):
                     # get the inputs
                     inputs, labels = data
-                    # print(model)
-                    # wrap them in Variable
-                    #if use_gpu:
-                    # intpus = model.to_var(inputs)
-                    # inputs = inputs.type(torch.FloatTensor),
+                    labels -= 1 
                     labels = labels.type(torch.LongTensor)       
                     labels = labels.long().squeeze() # from svhan labels byte to long and reform size 4x1 to size 4      
                     if phase == 'train':
                         inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
                         # zero the parameter gradients
                         optimizer.zero_grad()
-                        outputs = model(inputs)
+                        _, outputs = model(inputs)
                         _ , preds = torch.max(outputs.data , 1) # max index with row
                         loss = criterion(outputs, labels)
                         loss.backward()
                         optimizer.step()
                         # statistics
-                        training_loss = loss.data[0]
+                        training_loss += loss.data[0]
                         training_corrects += torch.sum(preds == labels.data)
+                        avg_train_loss = training_loss/len_data_loader['train'] 
+                        avg_train_corrects = training_corrects/len_data_loader['train'] 
+                        print('\nepoch :{} , step:{} , average train_loss:{:.4f}, average train_corrrects:{:.4f}'.format(epoch, step, avg_train_loss, avg_train_corrects))
                     else:
                         inputs, labels = Variable(inputs.cuda(), volatile=True), Variable(labels.cuda())
-                        outputs = model(inputs)
+                        _, outputs = model(inputs)
                         _ , preds = torch.max(outputs.data , 1) # max index with row
                         loss = criterion(outputs, labels)
                         test_loss += loss.data[0]
                         test_corrects += torch.sum(preds == labels.data)
-                        print("\ntest_corrects : ", test_corrects)
-            
-                        
+                        avg_test_loss = test_loss/len_data_loader['val'] 
+                        avg_test_corrects = test_corrects/len_data_loader['val']
+                        print('\nepoch :{} , step:{} ,average test_loss:{:.4f}, average test_corrects:{:.4f}'.format(epoch, step, avg_test_loss, avg_test_corrects))
+                    
+                print()
                 # statistics
                 epoch_training_loss = training_loss/len_data_loader['train']   
                 epoch_training_acc = training_corrects/len_data_loader['train']   
@@ -478,9 +478,8 @@ def train_test_model(model, criterion, optimizer, num_epochs=3):
                 if phase == 'val' and epoch_test_acc > best_acc:
                     best_acc = epoch_test_acc
                     is_best = best_acc
-                    #
-                    # best_model = copy.deepcopy(model)
-                    # save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
+                    best_model = copy.deepcopy(model)
+                    save_checkpoint({'epoch': epoch+1 , 'arch': config.arch, 'state_dict' : model.state_dict(), 'best_acc': best_acc},is_best)
         print()
         
     time_elapsed = time.time() - since
@@ -851,20 +850,16 @@ def train_generated_model_2(model_generator, model_encoder, model_disc , model_d
     if os.path.isfile(config.svhn_trainedmodel):
         print("=> loading checkpoint '{}'".format(config.svhn_trainedmodel))
         checkpoint = torch.load(config.svhn_trainedmodel)
-        trained_svhn_dicscrimator_model.load_state_dict(checkpoint['state_dict']) # fixed weight , bias for network 
-    
-    #mnist_iter = iter(mnist_train_loader)
-
-    #svhn_iter = iter(svhn_extra_train_loader)
-    #iter_per_epoch = min(len(svhn_iter), len(mnist_iter))
-    # print('iter_per_epoch :{}'.format(iter_per_epoch))
-    
-    if not os.path.isfile(config.svhn_trainedmodel):
+        model_encoder.load_state_dict(checkpoint['state_dict']) # fixed weight , bias for network 
+   
         model_generator.train()
         model_encoder.eval()
         model_disc.train()
-        
-        for epoch in range(config.num_iter):
+       
+        for param in model_encoder.parameters():
+            param.requirest_grad = False
+              
+        for epoch in range(6):
             print('Epoch {}/{}'.format(epoch, num_epochs - 1))
             print('--------------------------------------------')
                   
@@ -952,7 +947,7 @@ def train_generated_model_2(model_generator, model_encoder, model_disc , model_d
                 d_real_target_loss.backward()
                     
                 # forward ( LD second term )
-                encoded_mnist = model_encoder(mnist_3ch)
+                encoded_mnist, _ = model_encoder(mnist_3ch)
                 faked_mnist = model_generator(encoded_mnist)
                 generated_faked_mnist = faked_mnist.detach()
                 outputs_faked_mnist = model_disc(generated_faked_mnist)
@@ -961,7 +956,7 @@ def train_generated_model_2(model_generator, model_encoder, model_disc , model_d
                 d_fake_target_loss.backward()
                     
                 # forward ( LD first term )
-                encoded_svhn = model_encoder(svhn)
+                encoded_svhn, _ = model_encoder(svhn)
                 #print(' 1 fake_mnist size : ', encoded_mnist.size()) # [64, 128, 1, 1]
                 faked_svhn = model_generator(encoded_svhn) # [64, 1, 32, 32]
                 generated_faked_svhn = faked_svhn.detach()
@@ -1000,7 +995,7 @@ def train_generated_model_2(model_generator, model_encoder, model_disc , model_d
                 faked_svhn_3ch[:,2,:,:].copy_(faked_svhn.data)
                 faked_svhn_3ch = Variable(faked_svhn_3ch.cuda())
             
-                encoded_faked_svhn = model_encoder(faked_svhn_3ch)
+                encoded_faked_svhn, _ = model_encoder(faked_svhn_3ch)
                 Loss_CONST = criterionMSE(encoded_faked_svhn, encoded_svhn.detach())
                 Loss_CONST = config.alphaCONST*Loss_CONST
                 Loss_CONST.backward(retain_variables=True)
@@ -1043,7 +1038,7 @@ def train_generated_model_2(model_generator, model_encoder, model_disc , model_d
                     print("\n best Loss_D :{}, Loss_G :{}".format(Loss_D.data[0], Loss_G.data[0]))
                     # print("\n best Loss_D :{}, Loss_G :{}".format(L_D, L_G))
                 
-                fixed_encoded_svhn = model_encoder(fixed_svhn)
+                fixed_encoded_svhn, _ = model_encoder(fixed_svhn)
               
                 fixed_reconst_svhn = model_generator(fixed_encoded_svhn)
                
@@ -1099,11 +1094,16 @@ model_disc_2 = model.D_SVHN().cuda()
 criterion = nn.CrossEntropyLoss()     
 criterionMSE = nn.MSELoss()  
 
+optimzer_f = optim.Adam(model_encoder.parameters(), 0.02, betas= (config.beta1, 0.999))
 optimzer_g = optim.Adam(model_gen.parameters(), 0.02, betas= (config.beta1, 0.999))
 optimzer_disc = optim.Adam(model_disc.parameters(), 0.02, betas= (config.beta1, 0.999))
+ 
+ 
+# training step for Feature extractor 
+# model_encoder = train_test_model(model_encoder, criterion,optimzer_f)
   
 model_ft = train_generated_model_2(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, criterionMSE, optimzer_g, optimzer_disc,num_epochs=1)
-# model_ft = train_generated_model_(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, optimzer_g, optimzer_d1, optimzer_d2,optimzer_d3,num_epochs=5)  
+ 
 """
 for epoch in range(23):
     train_model_v2(model_ft, criterion, optimzer_ft, epoch)
