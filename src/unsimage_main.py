@@ -45,48 +45,6 @@ config = parser.parse_args()
 print(config)
 print(config.mnist_path)
 
-"""
-image_ind = 33
-train_data = sio.loadmat('../datasets/svhn/train_32x32.mat')
-
-# access to the dict
-x_train = train_data['X']
-y_train = train_data['y']
-
-print(y_train.astype(np.int64).squeeze())
-print("train_data labels :", train_data.keys())
-x_train_array = np.array(x_train)
-print("shape of x_train :", np.array(x_train_array).shape)
-print(x_train_array[0])
-
-x_train_rearranged = torch.from_numpy(x_train_array)
-x_train_rearr_var= Variable(x_train_rearranged).permute(3,2,0,1)
-
-print("shape of x_train_rearranged :",x_train_rearr_var.size())
-
-length_dict = {key:len(value) for key, value in train_data.items()}
-print("length_dict :", length_dict)
-print("values of y : ",y_train)
-print("x_train size :" ,len(x_train[0]))
-print("x_train size :" ,len(x_train))
-print(len(x_train[0]))
-print(len(x_train[0][0]))
-print(len(x_train[0][0][0]))
-print(x_train[0][0][0][73256])
-print(x_train[0])
-print("=============================================")
-print(x_train[0][0])
-print("=============================================")
-print()
-
-# show sample 
-plt.figure()
-#plt.imshow(x_train[:,:,:, image_ind])
-plt.imshow(x_train[0][31])
-plt.pause(5) # pause a bit so that plots are updated
-print(y_train[image_ind])
-"""
-
 def get_loader(config):
     """Builds and returns Dataloader for MNIST and SVHN dataset."""
     
@@ -144,19 +102,6 @@ def imshow(inp, title=None):
         plt.title(title)
     plt.pause(5)  # pause a bit so that plots are updated
 
-######################################################################
-# Training the model
-# ------------------
-#
-# Now, let's write a general function to train a model. Here, we will
-# illustrate:
-#
-# -  Scheduling the learning rate
-# -  Saving (deep copying) the best model
-#
-# In the following, parameter ``lr_scheduler(optimizer, epoch)``
-# is a function  which modifies ``optimizer`` so that the learning
-# rate is changed according to desired schedule.
 
 def to_var(x):
     """Converts numpy to variable"""
@@ -413,16 +358,10 @@ def train_generated_model_2(model_generator, model_encoder, model_disc , model_d
         model_generator.train()
         model_encoder.eval()
         model_disc.train()
-       
-        for param in model_encoder.parameters():
-            param.requirest_grad = False
-              
+               
         for epoch in range(6):
             print('Epoch {}/{}'.format(epoch, num_epochs - 1))
             print('--------------------------------------------')
-                  
-            running_loss =0.0
-            running_corrects = 0
             
             mnist_iter = iter(mnist_train_loader)
             svhn_iter = iter(svhn_extra_train_loader)    
@@ -431,8 +370,6 @@ def train_generated_model_2(model_generator, model_encoder, model_disc , model_d
             for step in range(iter_per_epoch-1 ):
                 
                 fixed_svhn = Variable(svhn_iter.next()[0].cuda()) 
-                # print("svhn_iter.next()[0]  :", svhn_iter.next()[0])
-                # print("-------------------------------------------------------")
                 # load svhn and mnist dataset
                 svhn, s_labels = svhn_iter.next() 
                 s_labels -= 1 # svhn ranged from 1 to 10
@@ -629,15 +566,10 @@ optimzer_disc = optim.Adam(model_disc.parameters(), 0.02, betas= (config.beta1, 
  
  
 # training step for Feature extractor 
-model_encoder = train_test_model(model_encoder, criterion,optimzer_f)
+# model_encoder = train_test_model(model_encoder, criterion,optimzer_f)
   
 model_ft = train_generated_model_2(model_gen, model_encoder, model_disc,model_disc_2 ,criterion, criterionMSE, optimzer_g, optimzer_disc,num_epochs=1)
- 
-"""
-for epoch in range(23):
-    train_model_v2(model_ft, criterion, optimzer_ft, epoch)
-    test_model_v2(model_ft, criterion, optimzer_ft, epoch)
-"""    
+     
 best_prec_SVHN= 0
 
 if os.path.isfile(config.svhn_trainedmodel):
