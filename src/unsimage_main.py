@@ -12,7 +12,6 @@ from torch.autograd import Variable
 import torch.optim as optim
 
 import model
-
 # for datasets ############################################
 import torchvision
 from torchvision import datasets, models, transforms
